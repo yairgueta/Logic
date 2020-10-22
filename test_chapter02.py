@@ -52,4 +52,4 @@ test_task6()
 test_task7()
 test_task8() # Optional
 test_task9() # Optional
-# test_task10(True) # Optional
+test_task10(True) # Optional
