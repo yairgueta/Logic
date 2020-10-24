@@ -64,9 +64,9 @@ def is_binary(string: str) -> bool:
     Returns:
         ``True`` if the given string is a binary operator, ``False`` otherwise.
     """
-    return string == '&' or string == '|' or string == '->'
+    # return string == '&' or string == '|' or string == '->'
     # For Chapter 3:
-    # return string in {'&', '|',  '->', '+', '<->', '-&', '-|'}
+    return string in {'&', '|', '->', '+', '<->', '-&', '-|'}
 
 
 @frozen
@@ -182,7 +182,6 @@ class Formula:
         else:
             return {self.root}.union(self.first.operators(), self.second.operators())
 
-
     @staticmethod
     def _parse_prefix(string: str) -> Tuple[Union[Formula, None], str]:
         """Parses a prefix of the given string into a formula.
@@ -215,19 +214,21 @@ class Formula:
             return Formula(string[0:i]), string[i:]
         elif string[0] == "(":
             first, rest = Formula._parse_prefix(string[1:])
-            if len(rest) <= 1 or (not is_binary(rest[0]) and not is_binary(rest[0:2])):
+            operator = ""
+            rester = rest
+            i = 0
+            while (not is_binary(operator)) and i < len(rester):
+                operator = rester[0:i]
+                rest = rester[i:]
+                i = i + 1
+
+            if not is_binary(operator):
                 return None, "Binary operators must be one of: &, |, ->"
-            if is_binary(rest[0]):
-                operator = rest[0]
-                rest = rest[1:]
-            else:
-                operator = rest[0:2]
-                rest = rest[2:]
 
             second, rest2 = Formula._parse_prefix(rest)
             if first is None or second is None or len(rest2) == 0 or rest2[0] != ")":
                 return None, "The use of binary operator is: '(<valid formula1>*<valid formula2>)', where * is" \
-                            " the binary operator."
+                             " the binary operator."
 
             return Formula(operator, first, second), rest2[1:]
         elif is_unary(string[0]):
@@ -348,7 +349,13 @@ class Formula:
         """
         for variable in substitution_map:
             assert is_variable(variable)
-        # Task 3.3
+        if is_variable(self.root) or is_constant(self.root):
+            return substitution_map.get(self.root, self)
+        if is_unary(self.root):
+            return Formula(self.root, self.first.substitute_variables(substitution_map))
+        if is_binary(self.root):
+            return Formula(self.root, self.first.substitute_variables(substitution_map),
+                           self.second.substitute_variables(substitution_map))
 
     def substitute_operators(self, substitution_map: Mapping[str, Formula]) -> \
             Formula:
@@ -377,4 +384,17 @@ class Formula:
             assert is_binary(operator) or is_unary(operator) or \
                    is_constant(operator)
             assert substitution_map[operator].variables().issubset({'p', 'q'})
-        # Task 3.4
+
+        p = Formula("p")
+        q = Formula("q")
+        if is_variable(self.root):
+            return self
+        if is_constant(self.root):
+            return substitution_map.get(self.root, self)
+        if is_unary(self.root):
+            _map = {'p': self.first.substitute_operators(substitution_map)}
+            return substitution_map.get(self.root, Formula(self.root, p)).substitute_variables(_map)
+        if is_binary(self.root):
+            _map = {'p': self.first.substitute_operators(substitution_map),
+                    'q': self.second.substitute_operators(substitution_map)}
+            return substitution_map.get(self.root, Formula(self.root, p, q)).substitute_variables(_map)

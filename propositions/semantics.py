@@ -72,12 +72,24 @@ def evaluate(formula: Formula, model: Model) -> bool:
         return model[formula.root]
     elif is_unary(formula.root):
         return not evaluate(formula.first, model)
-    elif formula.root == '&':
-        return evaluate(formula.first, model) and evaluate(formula.second, model)
-    elif formula.root == '|':
-        return evaluate(formula.first, model) or evaluate(formula.second, model)
-    else:
-        return (not evaluate(formula.first, model)) or evaluate(formula.second, model)
+    else:  # Dealing with binary
+        a = evaluate(formula.first, model)
+        b = evaluate(formula.second, model)
+        if formula.root == '&':
+            return a and b
+        elif formula.root == '|':
+            return a or b
+        elif formula.root == '->':
+            return (not a) or b
+        elif formula.root == '+':
+            return (not b) if a else b
+        elif formula.root == '<->':
+            return b if a else (not b)
+        elif formula.root == '-&':
+            return not (a and b)
+        elif formula.root == '-|':
+            return not (a or b)
+
 
 
 def all_models(variables: Sequence[str]) -> Iterable[Model]:
