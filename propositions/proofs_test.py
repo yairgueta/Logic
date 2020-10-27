@@ -201,8 +201,9 @@ def test_specialization_map(debug=False):
         s = InferenceRule([Formula.parse(f) for f in t[3]], Formula.parse(t[1]))
         d = None if t[4] is None else {v: Formula.parse(t[4][v]) for v in t[4]}
         if debug:
-            print("Testing if and how rule ", s, "is a special case of", g)
+            print("Testing if and how rule ", s, "is a special case of", g, 'MAP IS:', d)
         dd = g.specialization_map(s)
+
         assert d == dd, "expected " + str(d) + " got " + str(dd)
    
 def test_is_specialization_of(debug=False):
@@ -369,7 +370,8 @@ def test_rule_for_line(debug=False):
     for i in range(len(z)):
         if debug:
             print("Checking rule of line", str(i) + ":", proof.lines[i])
-        assert proof.rule_for_line(i) == z[i][1]   
+        answer = proof.rule_for_line(i)
+        assert answer == z[i][1], f"needed {z[i][1]}, got {answer}"
 
 def test_is_line_valid(debug=False):
     x1 = Formula.parse('x')
@@ -413,7 +415,8 @@ def test_is_line_valid(debug=False):
     for i in range(len(z)):
         if debug:
             print("Checking line", str(i) + ":", proof.lines[i])
-        assert proof.is_line_valid(i) == z[i][1]
+        answer = proof.is_line_valid(i)
+        assert answer == z[i][1], f"expected: {z[i][1]}, got: {answer}"
 
 def test_is_valid(debug=False):
     # Test variations on DISJUNCTION_COMMUTATIVITY_PROOF
