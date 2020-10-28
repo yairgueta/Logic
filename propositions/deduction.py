@@ -210,5 +210,4 @@ def prove_by_way_of_contradiction(proof: Proof) -> Proof:
 
     p = Proof(InferenceRule(nasm_proof.statement.assumptions, conclusion),
               nasm_proof.rules.union({MP, I0, I1, D, N}), new_lines)
-    print(p)
     return p
