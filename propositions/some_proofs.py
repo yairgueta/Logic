@@ -74,6 +74,13 @@ def prove_hypothetical_syllogism() -> Proof:
         `~propositions.axiomatic_systems.I1`, and
         `~propositions.axiomatic_systems.D`.
     """
+    p,q,r = Formula.parse('p'), Formula.parse('q'), Formula.parse('r')
+    lines = [Proof.Line(p),
+             Proof.Line(Formula('->', p, q)),
+             Proof.Line(q, MP, [0, 1]),
+             Proof.Line(Formula('->', q, r)),
+             Proof.Line(r, MP, [2, 3])]
+    return remove_assumption(Proof(InferenceRule(list(HS.assumptions)+[p], r), {MP, I0, I1, D}, lines))
     # Task 5.5
 
 def prove_I2() -> Proof:

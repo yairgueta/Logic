@@ -587,8 +587,8 @@ def test_prove_specialization(debug=False):
                   str(DISJUNCTION_RIGHT_ASSOCIATIVITY_PROOF))
         instance_proof = prove_specialization(
             DISJUNCTION_RIGHT_ASSOCIATIVITY_PROOF, instance)
-        #if debug:
-            #print('Got:\n', instance_proof)    
+        if debug:
+            print('Got:\n', instance_proof)
         assert instance_proof.statement == instance
         assert instance_proof.rules == \
                DISJUNCTION_RIGHT_ASSOCIATIVITY_PROOF.rules

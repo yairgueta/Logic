@@ -92,7 +92,7 @@ def test_combine_proofs(debug=False):
         pnpiq = combine_proofs(pp, pnq, h, r)
         assert pnpiq.rules == pp.rules
         assert pnpiq.statement.conclusion == h
-        assert pnpiq.statement.assumptions == pp.statement.assumptions
+        assert pnpiq.statement.assumptions == pp.statement.assumptions, f'got: {pnpiq.statement.assumptions}, need: {pp.statement.assumptions}'
         assert pnpiq.is_valid(), offending_line(pnpiq)
 
 R1 = InferenceRule([Formula.parse('(p|q)'), Formula.parse('(~p|r)')],
@@ -270,7 +270,7 @@ def test_prove_by_way_of_contradiction(debug=False):
     if debug:
         print("Testing prove_by_way_of_contradiction on proof of", p.statement)
     p = prove_by_way_of_contradiction(p)
-    assert p.statement.conclusion == Formula.parse('r')
+    assert p.statement.conclusion == Formula.parse('r'), p.statement.conclusion
     assert p.statement.assumptions == assumptions[:-1]
     assert p.rules == {MP, I0, I1, D, N, NI}
     assert p.is_valid(), offending_line(p)
