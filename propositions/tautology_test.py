@@ -99,12 +99,13 @@ def test_prove_tautology(debug=False):
         assert p.rules == AXIOMATIC_SYSTEM
         assert p.is_valid(), offending_line(p)
 
-    for t in [ '((~q->~p)->(p->q))', '(~~p->p)', '(p->~~p)',
+    for t in [
+        '((~q->~p)->(p->q))', '(~~p->p)', '(p->~~p)',
                '((~p->~q)->((p->~q)->~q))',
-               #'((p1->(p2->(p3->p4)))->(p3->(p2->(p1->p4))))',  
+               '((p1->(p2->(p3->p4)))->(p3->(p2->(p1->p4))))',
                '((p2->(p3->p4))->(p3->(p2->p4)))',
-               #'(((((p->q)->(~r->~s))->r)->t)->((t->p)->(s->p)))',   
-               #'(((((r->q)->(~r->~q))->r)->t)->((t->r)->(q->r)))',    
+               '(((((p->q)->(~r->~s))->r)->t)->((t->p)->(s->p)))',
+               '(((((r->q)->(~r->~q))->r)->t)->((t->r)->(q->r)))',
                '(~~~~x13->~~x13)']:
         t = Formula.parse(t)
         if debug:
@@ -245,7 +246,7 @@ def test_prove_in_model_full(debug=False):
         if debug:
             print('Testing prove_in_model_full on formula',f, 'in model', m)
         p = prove_in_model_full(f, frozendict(m))
-        assert p.statement == InferenceRule(a, c)
+        assert p.statement == InferenceRule(a, c), "neeed: " +str(InferenceRule(a, c)) + 'got: ' + str(p.statement)
         assert p.rules == AXIOMATIC_SYSTEM_FULL
         assert p.is_valid(), offending_line(p)
            

@@ -134,25 +134,17 @@ class InferenceRule:
             ``None`` or if some key appears in both given maps but with
             different values.
         """
-        merged_map = {}
         if specialization_map1 is not None:
-            for variable, formula in specialization_map1.items():
+            for variable in specialization_map1:
                 assert is_variable(variable)
-                merged_map[variable] = formula
-        else:
-            return None
-
         if specialization_map2 is not None:
-            for variable, formula in specialization_map2.items():
+            for variable in specialization_map2:
                 assert is_variable(variable)
-                if specialization_map1.get(variable, formula) != formula:
-                    return None
-                else:
-                    merged_map[variable] = formula
-        else:
-            return None
-
-        return merged_map
+        if specialization_map2 is not None and specialization_map1 is not None:
+            d1 = {**specialization_map1, **specialization_map2}
+            if d1 == {**specialization_map2, **specialization_map1}:
+                return d1
+        return None
 
     @staticmethod
     def _formula_specialization_map(general: Formula, specialization: Formula) \
@@ -395,8 +387,7 @@ class Proof:
         if line.is_assumption():
             return line.formula in self.statement.assumptions
         line_s_rule = self.rule_for_line(line_number)
-        return line_s_rule.is_specialization_of(line.rule) and line.rule in self.rules and all(
-            [s < line_number for s in line.assumptions])
+        return line_s_rule.is_specialization_of(line.rule) and line.rule in self.rules and all(s < line_number for s in line.assumptions)
 
     def is_valid(self) -> bool:
         """Checks if the current proof is a valid proof of its claimed statement
@@ -525,3 +516,4 @@ def inline_proof(main_proof: Proof, lemma_proof: Proof) -> Proof:
     main_proof = Proof(main_proof.statement, main_proof.rules.difference({lemma_proof.statement}), main_proof.lines)
     return main_proof
     # Task 5.2b
+

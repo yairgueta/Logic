@@ -33,8 +33,7 @@ def prove_corollary(antecedent_proof: Proof, consequent: Formula,
     """
     phi_imp_psi = Formula('->', antecedent_proof.statement.conclusion, consequent)
     assert antecedent_proof.is_valid()
-    assert InferenceRule([], phi_imp_psi).is_specialization_of(
-        conditional), f"phi->psi: {phi_imp_psi}\ngeneral: {conditional}"
+    assert InferenceRule([], phi_imp_psi).is_specialization_of(conditional)
 
     new_lines = list(antecedent_proof.lines)  # proof of phi
     new_lines.append(Proof.Line(phi_imp_psi, conditional, []))  # phi implies psi
@@ -45,6 +44,7 @@ def prove_corollary(antecedent_proof: Proof, consequent: Formula,
     new_proof = Proof(InferenceRule([antecedent_proof.statement.assumptions[0]], consequent),
                       antecedent_proof.rules.union({MP, conditional}),
                       new_lines)
+    print("got:\n", new_proof)
     return new_proof
 
 
@@ -119,17 +119,15 @@ def remove_assumption(proof: Proof) -> Proof:
         if zi == phi:
             new_lines.append(Proof.Line(Formula('->', phi, phi), I0, []))
         elif line.rule == MP:
-            j,k = line.assumptions
-            j,k = lines_map[j], lines_map[k]
-            zj = new_lines[j].formula
-            zk = new_lines[k].formula
+            j, k = (lines_map[a] for a in line.assumptions)
+            zj, zk = new_lines[j].formula, new_lines[k].formula
             phi_imp_zi = Formula('->', phi, zi)
             phi_imp_zj = zj
             p_imp_j__imp__p_imp_i = Formula('->', phi_imp_zj, phi_imp_zi)  # (phi->j)->(phi->i)
             p_imp__j_imp_i = zk  # phi->(j->i)
             new_lines.append(Proof.Line(Formula('->', p_imp__j_imp_i, p_imp_j__imp__p_imp_i), D, []))
-            new_lines.append(Proof.Line(p_imp_j__imp__p_imp_i, MP, [k, i+lines_bias]))
-            new_lines.append(Proof.Line(phi_imp_zi, MP, [j, i+lines_bias+1]))
+            new_lines.append(Proof.Line(p_imp_j__imp__p_imp_i, MP, [k, i + lines_bias]))
+            new_lines.append(Proof.Line(phi_imp_zi, MP, [j, i + lines_bias + 1]))
             lines_bias += 2
         elif line.formula in new_assumptions or line.rule in proof.rules:
             phi_imp_zi = Formula('->', phi, zi)
