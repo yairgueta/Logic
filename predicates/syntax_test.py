@@ -88,7 +88,7 @@ def test_term_functions(debug=False):
         functions = Term.parse(s).functions()
         if debug:
             print('The functions in', s, 'are', functions)
-        assert functions == expected
+        assert functions == expected, expected
 
 def test_term_substitute(debug=False):
     # Test substitution of a single variable

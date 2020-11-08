@@ -79,6 +79,7 @@ def is_function(string: str) -> bool:
     """
     return string[0] >= 'f' and string[0] <= 't' and string.isalnum()
 
+
 def find_relevant_part(string: str, func):
     i = 1
     while i < len(string) + 1:
@@ -88,6 +89,7 @@ def find_relevant_part(string: str, func):
             i -= 1
             break
     return i
+
 
 @frozen
 class Term:
@@ -185,15 +187,12 @@ class Term:
         elif is_function(string[0]):
             terms_lst = []
             i = string.index('(')
-            t, rest = Term._parse_prefix(string[i+1:])
+            t, rest = Term._parse_prefix(string[i + 1:])
             terms_lst.append(t)
             while rest[0] == ',':
                 t, rest = Term._parse_prefix(rest[1:])
                 terms_lst.append(t)
             return Term(string[:i], terms_lst), rest[1:]
-
-
-
 
     @staticmethod
     def parse(string: str) -> Term:
@@ -210,6 +209,17 @@ class Term:
         assert prefix is not None and len(suffix) == 0
         return prefix
 
+    def __collect_vars(self, final_set, func):
+        if is_function(self.root):
+            if func(self.root):
+                final_set.add((self.root, len(self.arguments)))
+            for arg in self.arguments:
+                arg.__collect_vars(final_set, func)
+        elif func(self.root):
+            final_set.add(self.root)
+        else:
+            return
+
     @memoized_parameterless_method
     def constants(self) -> Set[str]:
         """Finds all constant names in the current term.
@@ -218,6 +228,9 @@ class Term:
             A set of all constant names used in the current term.
         """
         # Task 7.5.1
+        final_set = set()
+        self.__collect_vars(final_set, is_constant)
+        return final_set
 
     @memoized_parameterless_method
     def variables(self) -> Set[str]:
@@ -227,6 +240,9 @@ class Term:
             A set of all variable names used in the current term.
         """
         # Task 7.5.2
+        final_set = set()
+        self.__collect_vars(final_set, is_variable)
+        return final_set
 
     @memoized_parameterless_method
     def functions(self) -> Set[Tuple[str, int]]:
@@ -238,6 +254,9 @@ class Term:
             all function names used in the current term.
         """
         # Task 7.5.3
+        final_set = set()
+        self.__collect_vars(final_set, is_function)
+        return final_set
 
     def substitute(self, substitution_map: Mapping[str, Term],
                    forbidden_variables: AbstractSet[str] = frozenset()) -> Term:
@@ -484,42 +503,41 @@ class Formula:
         """
         # Task 7.4.1
 
-
         if is_relation(string[0]):
             terms = []
             i = string.index('(')
-            t, rest = Term._parse_prefix(string[i:])
-            terms.append(t)
-            while rest[0] == ',':
-                pass
-            return Formula(string[:i])
+            if string[i + 1] != ')':
+                t, rest = Term._parse_prefix(string[i + 1:])
+                terms.append(t)
+                while rest[0] == ',':
+                    t, rest = Term._parse_prefix(rest[1:])
+                    terms.append(t)
+                rest = rest[1:]
+            else:
+                rest = string[i + 2:]
+            return Formula(string[:i], terms), rest
         elif is_unary(string[0]):
             f, rest = Formula._parse_prefix(string[1:])
             return Formula('~', f), rest
         elif string[0] == '(':
             first, rest = Formula._parse_prefix(string[1:])
-            # rester = rest
-            # i = 0
-            # while (not is_binary(operator)) and i < len(rester):
-            #     operator = rester[0:i]
-            #     rest = rester[i:]
-            #     i = i + 1
-            i = find_relevant_part(rest, is_binary)
+            if is_binary(rest[0]):
+                i = 1
+            else:
+                i = 2
             operator, rest = rest[:i], rest[i:]
             second, rest2 = Formula._parse_prefix(rest)
             return Formula(operator, first, second), rest2[1:]
         elif is_quantifier(string[0]):
             i = string.index('[')
             var_name = string[1:i]
-            f, rest = Formula._parse_prefix(string[i+1:])
+            f, rest = Formula._parse_prefix(string[i + 1:])
             return Formula(string[0], var_name, f), rest[1:]
         else:
-            i = string.index('=')
-            t1 = Term(string[:i])
-            t2 = Term(string[i+1:])
-
-
-
+            # i = string.index('=')
+            t1, rest = Term._parse_prefix(string)
+            t2, rest = Term._parse_prefix(rest[1:])
+            return Formula('=', [t1, t2]), rest
 
     @staticmethod
     def parse(string: str) -> Formula:
@@ -531,7 +549,9 @@ class Formula:
         Returns:
             A formula whose standard string representation is the given string.
         """
-        # Task 7.4.2
+        parsed, rest = Formula._parse_prefix(string)
+        assert rest is not None
+        return parsed
 
     @memoized_parameterless_method
     def constants(self) -> Set[str]:
@@ -541,6 +561,18 @@ class Formula:
             A set of all constant names used in the current formula.
         """
         # Task 7.6.1
+        if is_equality(self.root) or is_relation(self.root):
+            s = set()
+            for term in self.arguments:
+                s.update(term.constants())
+            return s
+        elif is_unary(self.root):
+            return self.first.constants()
+        elif is_binary(self.root):
+            return self.first.constants().union(self.second.constants())
+        else:
+            # quantifier
+            return self.predicate.constants()
 
     @memoized_parameterless_method
     def variables(self) -> Set[str]:
@@ -550,6 +582,18 @@ class Formula:
             A set of all variable names used in the current formula.
         """
         # Task 7.6.2
+        if is_equality(self.root) or is_relation(self.root):
+            s = set()
+            for term in self.arguments:
+                s.update(term.variables())
+            return s
+        elif is_unary(self.root):
+            return self.first.variables()
+        elif is_binary(self.root):
+            return self.first.variables().union(self.second.variables())
+        else:
+            # quantifier
+            return self.predicate.variables().union({self.variable})
 
     @memoized_parameterless_method
     def free_variables(self) -> Set[str]:
@@ -560,6 +604,21 @@ class Formula:
             only within a scope of a quantification on that variable name.
         """
         # Task 7.6.3
+        if is_equality(self.root) or is_relation(self.root):
+            s = set()
+            for term in self.arguments:
+                s.update(term.variables())
+            return s
+        elif is_unary(self.root):
+            return self.first.free_variables()
+        elif is_binary(self.root):
+            return self.first.free_variables().union(
+                self.second.free_variables())
+        else:
+            # quantifier
+            x = self.predicate.free_variables()
+            x.discard(self.variable)
+            return x
 
     @memoized_parameterless_method
     def functions(self) -> Set[Tuple[str, int]]:
@@ -571,6 +630,18 @@ class Formula:
             all function names used in the current formula.
         """
         # Task 7.6.4
+        if is_equality(self.root) or is_relation(self.root):
+            s = set()
+            for term in self.arguments:
+                s.update(term.functions())
+            return s
+        elif is_unary(self.root):
+            return self.first.functions()
+        elif is_binary(self.root):
+            return self.first.functions().union(self.second.functions())
+        else:
+            # quantifier
+            return self.predicate.functions()
 
     @memoized_parameterless_method
     def relations(self) -> Set[Tuple[str, int]]:
@@ -582,6 +653,17 @@ class Formula:
             all relation names used in the current formula.
         """
         # Task 7.6.5
+        if is_equality(self.root):
+            return set()
+        elif is_relation(self.root):
+            return {(self.root, len(self.arguments))}
+        elif is_unary(self.root):
+            return self.first.relations()
+        elif is_binary(self.root):
+            return self.first.relations().union(self.second.relations())
+        else:
+            # quantifier
+            return self.predicate.relations()
 
     def substitute(self, substitution_map: Mapping[str, Term],
                    forbidden_variables: AbstractSet[str] = frozenset()) -> \
