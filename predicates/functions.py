@@ -65,6 +65,13 @@ def replace_functions_with_relations_in_model(model: Model[T]) -> Model[T]:
         assert function_name_to_relation_name(function) not in \
                model.relation_meanings
     # Task 8.1
+    new_relation_meanings = dict(**model.relation_meanings)
+    for f_name, function in model.function_meanings.items():
+        relation_set = set()
+        for key, y in function.items():
+            relation_set.add((y, *key))
+        new_relation_meanings[function_name_to_relation_name(f_name)] = relation_set
+    return Model(model.universe, model.constant_meanings, new_relation_meanings)
 
 def replace_relations_with_functions_in_model(model: Model[T],
                                               original_functions:
@@ -91,6 +98,22 @@ def replace_relations_with_functions_in_model(model: Model[T],
         assert function_name_to_relation_name(function) in \
                model.relation_meanings
     # Task 8.2
+    relation_meanings = dict(**model.relation_meanings)
+    functions_map = dict()
+    for f in original_functions:
+        r_name = function_name_to_relation_name(f)
+        function_map = dict()
+        del relation_meanings[r_name]
+        _input = []
+        for relation in model.relation_meanings[r_name]:
+            _input, _output = relation[1:], relation[0]
+            if _input in function_map:
+                return None
+            function_map[_input] = _output
+        if len(function_map) != len(model.universe) ** len(_input):
+            return None
+        functions_map[f] = function_map
+    return Model(model.universe, model.constant_meanings, relation_meanings, functions_map)
 
 def _compile_term(term: Term) -> List[Formula]:
     """Syntactically compiles the given term into a list of single-function
@@ -116,6 +139,15 @@ def _compile_term(term: Term) -> List[Formula]:
     for variable in term.variables():
         assert variable[0] != 'z'
     # Task 8.3
+    lst_formulas = []
+    for arg in term.arguments:
+        if is_function(arg.root):
+            lst_formulas.extend(_compile_term(arg))
+        else:
+            lst_formulas.append(Formula('=', [arg, next(fresh_variable_name_generator)]))
+
+
+
 
 def replace_functions_with_relations_in_formula(formula: Formula) -> Formula:
     """Syntactically converts the given formula to a formula that does not
