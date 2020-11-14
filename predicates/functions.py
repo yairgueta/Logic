@@ -152,6 +152,7 @@ def _compile_term(term: Term) -> List[Formula]:
 
 
 def __compile_helper(term, formulas):
+    # Task 8.3 helper
     new_args = []
     for arg in term.arguments:
         if is_function(arg.root):
@@ -186,6 +187,41 @@ def replace_functions_with_relations_in_formula(formula: Formula) -> Formula:
     for variable in formula.variables():
         assert variable[0] != 'z'
     # Task 8.4
+    return __replace_functions_helper(formula)
+
+
+def __replace_functions_helper(formula : Formula) -> Formula:
+    if is_unary(formula.root):
+        return Formula(formula.root, __replace_functions_helper(formula.first))
+    elif is_binary(formula.root):
+        return Formula(formula.root, __replace_functions_helper(formula.first), __replace_functions_helper(formula.second))
+    elif is_quantifier(formula.root):
+        return Formula(formula.root, formula.variable, __replace_functions_helper(formula.predicate))
+    else:
+        return __convert_functions_in_relation(formula)
+
+
+def __convert_functions_in_relation(formula : Formula) -> Formula:
+    """formula must be a relation (or equality)!"""
+    new_terms = []
+    compiled = []
+    for t in formula.arguments:
+        if is_function(t.root):
+            c = _compile_term(t)
+            compiled.extend(c)
+            new_terms.append(c[-1].arguments[0])
+        else:
+            new_terms.append(t)
+
+    current_formula = Formula(formula.root, new_terms)
+    while compiled:
+        z, f = compiled.pop().arguments
+        # print(z, f)
+        relation = Formula(function_name_to_relation_name(f.root), [z] + list(f.arguments))
+        current_formula = Formula("E", z.root, Formula("&", relation, current_formula))
+
+    return current_formula
+
 
 
 def replace_functions_with_relations_in_formulas(formulas:
@@ -230,6 +266,13 @@ AbstractSet[Formula]) -> \
         for variable in formula.variables():
             assert variable[0] != 'z'
     # Task 8.5
+    new_set = set()
+    for f in formulas:
+        new_set.add(replace_functions_with_relations_in_formula(f))
+        z1, z2 = Term("z1"), Term("z2")
+        inputs = [Term("x"+str(i)) for i in range(1, )]
+
+
 
 
 def replace_equality_with_SAME_in_formulas(formulas: AbstractSet[Formula]) -> \
