@@ -85,7 +85,7 @@ class Model(Generic[T]):
                 for arguments in relation_meaning:
                     assert len(arguments) == arity
                     for argument in arguments:
-                        assert argument in universe
+                        assert argument in universe, "argument is: " + argument
             relation_arities[relation] = arity
         self.relation_meanings = \
             frozendict({relation: frozenset(relation_meanings[relation]) for

@@ -267,11 +267,23 @@ AbstractSet[Formula]) -> \
             assert variable[0] != 'z'
     # Task 8.5
     new_set = set()
+    z1, z2 = Term("z1"), Term("z2")
+    z1eqz2 = Formula("=", [z1, z2])
     for f in formulas:
         new_set.add(replace_functions_with_relations_in_formula(f))
-        z1, z2 = Term("z1"), Term("z2")
-        inputs = [Term("x"+str(i)) for i in range(1, )]
+        for name, num_parameters in f.functions():
+            inputs = [Term("x"+str(i)) for i in range(1, num_parameters+1)]
+            relation_name = function_name_to_relation_name(name)
+            r1, r2 = Formula(relation_name, [z1]+inputs), Formula(relation_name, [z2]+inputs)
 
+            inner1 = Formula("E", z1.root, r1)
+            inner2 = Formula("A", z1.root, Formula("A", z2.root, Formula("->", Formula("&", r1, r2), z1eqz2)))
+
+            for i in inputs:
+                inner1 = Formula("A", i.root, inner1)
+                inner2 = Formula("A", i.root, inner2)
+            new_set.add(Formula("&", inner1, inner2))
+    return new_set
 
 
 
@@ -302,7 +314,54 @@ def replace_equality_with_SAME_in_formulas(formulas: AbstractSet[Formula]) -> \
         assert 'SAME' not in \
                {relation for relation, arity in formula.relations()}
     # Task 8.6
+    relations_respects = set()
+    x, y, z = Term('x'), Term("y"), Term("z")
+    x_s_y, y_s_x, y_s_z, x_s_z = Formula("SAME", [x, y]), Formula("SAME", [y, x]), Formula("SAME", [y, z]), Formula("SAME", [x, z])
+    basic_properties = {Formula("A", x.root, Formula("SAME", [x, x])),
+                        Formula("A", x.root, Formula("A", y.root, Formula("&",
+                                                                          Formula("->", x_s_y, y_s_x),
+                                                                          Formula("->", y_s_x, x_s_y)))),
+                        Formula("A", x.root,
+                                Formula("A", y.root,
+                                        Formula("A", z.root,
+                                                Formula("->", Formula("&", x_s_y, y_s_z), x_s_z))))}
+    for formula in formulas:
+        basic_properties.add(__find_and_replace_equalities(formula, relations_respects))
 
+    return basic_properties.union(relations_respects)
+
+
+def __find_and_replace_equalities(formula: Formula, relations_respects) -> Formula:
+    if is_unary(formula.root):
+        return Formula(formula.root, __find_and_replace_equalities(formula.first, relations_respects))
+    elif is_binary(formula.root):
+        return Formula(formula.root, __find_and_replace_equalities(formula.first, relations_respects),
+                       __find_and_replace_equalities(formula.second, relations_respects))
+    elif is_quantifier(formula.root):
+        return Formula(formula.root, formula.variable, __find_and_replace_equalities(formula.predicate, relations_respects))
+    elif is_relation(formula.root):
+        xs, ys = [], []
+        respective_formula = None
+
+        for i in range(1, len(formula.arguments)+1):
+            xs.append(Term("x"+str(i)))
+            ys.append(Term("y"+str(i)))
+            if i > 1:
+                respective_formula = Formula("&", Formula("SAME", [xs[-1], ys[-1]]), respective_formula)
+            else:
+                respective_formula = Formula("SAME", [xs[0], ys[0]])
+
+        respective_formula = Formula("->", respective_formula, Formula("->",
+                                                                       Formula(formula.root, xs),
+                                                                       Formula(formula.root, ys)))
+        for t in xs+ys:
+            respective_formula = Formula("A", t.root, respective_formula)
+
+        if respective_formula is not None:
+            relations_respects.add(respective_formula)
+        return formula
+    else:
+        return Formula("SAME", formula.arguments)
 
 def add_SAME_as_equality_in_model(model: Model[T]) -> Model[T]:
     """Adds a meaning for the relation name ``'SAME'`` in the given model, that
@@ -320,6 +379,9 @@ def add_SAME_as_equality_in_model(model: Model[T]) -> Model[T]:
     """
     assert 'SAME' not in model.relation_meanings
     # Task 8.7
+    new_relations = dict(**model.relation_meanings)
+    new_relations["SAME"] = {(x, x) for x in model.universe}
+    return Model(model.universe, model.constant_meanings, new_relations, model.function_meanings)
 
 
 def make_equality_as_SAME_in_model(model: Model[T]) -> Model[T]:
@@ -346,8 +408,51 @@ def make_equality_as_SAME_in_model(model: Model[T]) -> Model[T]:
            model.relation_arities['SAME'] == 2
     assert len(model.function_meanings) == 0
     # Task 8.8
+    new_constants = dict(**model.constant_meanings)
+    new_relations = dict(**model.relation_meanings)
+    same_relation = new_relations.pop("SAME")
 
+    equivalence_classes = []
+    uni = set(model.universe)
 
-if __name__ == '__main__':
-    a = Formula.parse('z1=g(0)')
-    print(a)
+    while uni:
+        x = uni.pop()
+        cls = {x}
+        for y in list(uni):
+            if (x, y) in same_relation:
+                cls.update(y)
+                uni.remove(y)
+        equivalence_classes.append(cls)
+
+    shrink_universe = set()
+    equivalence_mapping = dict()
+    for cls in equivalence_classes:
+        representative = cls.pop()
+        equivalence_mapping.update({str(x): representative for x in cls})
+        shrink_universe.update(representative)
+
+    equivalence_others = equivalence_mapping.keys()
+    for k, v in new_constants.items():
+        if v in equivalence_others:
+            new_constants[k] = equivalence_mapping[v]
+
+    # new_constants.update(equivalence_mapping)
+    # TODO: why not??
+
+    copy_new_relations = dict()
+    for name, relation in new_relations.items():
+        new_relation = set()
+        for args in relation:
+            new_relation.add(tuple([equivalence_mapping.get(i, i) for i in args]))
+        copy_new_relations[name] = new_relation
+
+    new_functions = dict()
+    for name, function in model.function_meanings.items():
+        new_function = dict()
+        for _input, _output in function.items():
+            new_function[tuple([equivalence_mapping.get(i, i) for i in _input])] = equivalence_mapping.get(_output, _output)
+        new_functions[name] = new_function
+
+    # print(shrink_universe)
+    # print(new_constants)
+    return Model(shrink_universe, new_constants, copy_new_relations, new_functions)
