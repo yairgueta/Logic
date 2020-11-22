@@ -732,7 +732,6 @@ class Formula:
     def __substitute_formula_helper(self, forbidden_variables, substitution_map, free_vars):
         if is_equality(self.root) or is_relation(self.root):
             new_arguments = []
-            print(free_vars)
             for arg in self.arguments:
                 if not arg.variables().issubset(free_vars):
                     new_arguments.append(arg)
@@ -779,6 +778,21 @@ class Formula:
             (((z4&z5)|(z5->~z6)), {'z4': Ax[x=7], 'z5': x=7, 'z6': Q(y)})
         """
         # Task 9.8
+        var_map = dict()
+        return self.__skeleton_helper(var_map), {key: val for val, key in var_map.items()}
+
+    def __skeleton_helper(self, var_map):
+        if is_equality(self.root) or is_relation(self.root) or is_quantifier(self.root):
+            zi = var_map.get(self)
+            if not zi:
+                zi = next(fresh_variable_name_generator)
+                var_map.update({self: zi})
+            return PropositionalFormula(zi)
+        elif is_unary(self.root):
+            return PropositionalFormula(self.root, self.first.__skeleton_helper(var_map))
+        elif is_binary(self.root):
+            return PropositionalFormula(self.root, self.first.__skeleton_helper(var_map),
+                                        self.second.__skeleton_helper(var_map))
 
     @staticmethod
     def from_propositional_skeleton(skeleton: PropositionalFormula,
@@ -811,3 +825,11 @@ class Formula:
         for variable in skeleton.variables():
             assert variable in substitution_map
         # Task 9.10
+        if is_propositional_variable(skeleton.root):
+            return substitution_map[skeleton.root]
+        elif is_unary(skeleton.root):
+            return Formula(skeleton.root, Formula.from_propositional_skeleton(skeleton.first, substitution_map))
+        else:
+            return Formula(skeleton.root, Formula.from_propositional_skeleton(skeleton.first,
+                                                                              substitution_map),
+                           Formula.from_propositional_skeleton(skeleton.second, substitution_map))
