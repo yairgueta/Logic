@@ -263,7 +263,7 @@ def test_make_equality_as_SAME_in_model(debug):
     if debug:
         print('... got', new_model)
     assert len(new_model.universe) == 2
-    assert new_model.constant_meanings.keys() == {'a', 'b', 'c'}
+    assert new_model.constant_meanings.keys() == {'a', 'b', 'c'}, new_model.constant_meanings.keys()
     assert new_model.constant_meanings['b'] == new_model.constant_meanings['c']
     assert new_model.constant_meanings['a'] != new_model.constant_meanings['b']
     assert new_model.relation_meanings.keys() == {'Q'}
