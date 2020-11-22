@@ -241,6 +241,15 @@ class Schema:
         for variable in bound_variables:
             assert is_variable(variable)
         # Task 9.3
+        if is_equality(formula.root):
+            return formula.substitute(constants_and_variables_instantiation_map)
+        elif is_relation(formula.root):
+            if formula.root not in relations_instantiation_map:
+                return formula.substitute(constants_and_variables_instantiation_map)
+            else:
+                num_params = formula.
+
+
 
     def instantiate(self, instantiation_map: InstantiationMap) -> \
             Union[Formula, None]:
