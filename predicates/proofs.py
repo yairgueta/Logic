@@ -884,10 +884,11 @@ def _prove_from_skeleton_proof(formula: Formula,
         else:
             axiom = PROPOSITIONAL_AXIOM_TO_SCHEMA[line.rule]
             v = PropositionalInferenceRule._formula_specialization_map(
-                                                  line.rule.conclusion, line.formula)
-            lines.append(Proof.AssumptionLine(skeleton, axiom,{key: val.capitalize() for val, key in v.items()}))
-
-        print(lines[-1])
+                line.rule.conclusion, line.formula)
+            items_ = dict()
+            for key, val in v.items():
+                items_[key.capitalize()] = Formula.from_propositional_skeleton(val, substitution_map)
+            lines.append(Proof.AssumptionLine(skeleton, axiom, items_))
     return Proof(PROPOSITIONAL_AXIOMATIC_SYSTEM_SCHEMAS, formula, lines)
 
 
@@ -904,3 +905,6 @@ def prove_tautology(tautology: Formula) -> Proof:
     """
     assert is_propositional_tautology(tautology.propositional_skeleton()[0])
     # Task 9.12
+    ps = tautology.propositional_skeleton()
+    skeleton_proof = prove_propositional_tautology(ps[0])
+    return _prove_from_skeleton_proof(tautology, skeleton_proof, ps[1])
