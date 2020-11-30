@@ -8,12 +8,13 @@
 using them."""
 
 from typing import AbstractSet, Collection, FrozenSet, List, Mapping, \
-                   Sequence, Tuple, Union
+    Sequence, Tuple, Union
 
 from logic_utils import fresh_variable_name_generator
 
 from predicates.syntax import *
 from predicates.proofs import *
+
 
 class Prover:
     """A class for gradually creating a predicate-logic proof from given
@@ -54,7 +55,7 @@ class Prover:
     AXIOMS = frozenset({UI, EI, US, ES, RX, ME})
 
     def __init__(self, assumptions: Collection[Union[Schema, Formula, str]],
-                 print_as_proof_forms: bool=False):
+                 print_as_proof_forms: bool = False):
         """Initializes a `Prover` from its assumptions/additional axioms. The
         proof created by the prover initially has no lines.
 
@@ -70,7 +71,7 @@ class Prover:
             Prover.AXIOMS.union(
                 {assumption if isinstance(assumption, Schema)
                  else Schema(assumption) if isinstance(assumption, Formula)
-                 else Schema(Formula.parse(assumption))
+                else Schema(Formula.parse(assumption))
                  for assumption in assumptions})
         self._lines = []
         self._print_as_proof_forms = print_as_proof_forms
@@ -78,7 +79,7 @@ class Prover:
             print('Proving from assumptions/axioms:\n'
                   '  AXIOMS')
             for assumption in self._assumptions - Prover.AXIOMS:
-                  print('  ' + str(assumption))
+                print('  ' + str(assumption))
             print('Lines:')
 
     def qed(self) -> Proof:
@@ -154,7 +155,7 @@ class Prover:
                     assert isinstance(value, Formula)
         return self._add_line(Proof.AssumptionLine(instance, assumption,
                                                    instantiation_map))
-        
+
     def add_assumption(self, unique_instance: Union[Formula, str]) -> int:
         """Appends to the proof being created by the current prover a line that
         validly justifies the unique instance of one of the assumptions/axioms
@@ -268,7 +269,7 @@ class Prover:
                             line.predicate_line_number + line_shift)
         line_number = len(self._lines) - 1
         assert self._lines[line_number].formula == conclusion
-        return line_number                
+        return line_number
 
     def add_universal_instantiation(self, instantiation: Union[Formula, str],
                                     line_number: int, term: Union[Term, str]) \
@@ -307,6 +308,10 @@ class Prover:
         assert instantiation == \
                quantified.predicate.substitute({quantified.variable: term})
         # Task 10.1
+        _map = {'R': quantified.predicate.substitute({quantified.variable: Term('_')}), 'c': term}
+        step1 = self.add_instantiated_assumption(Formula('->', quantified, instantiation), Prover.UI, _map)
+        step2 = self.add_mp(instantiation, line_number, step1)
+        return step2
 
     def add_tautological_implication(self, implication: Union[Formula, str],
                                      line_numbers: AbstractSet[int]) -> int:
@@ -484,9 +489,9 @@ class Prover:
             parametrized_term = Term.parse(parametrized_term)
         assert substituted == \
                Formula('=', [parametrized_term.substitute(
-                                 {'_': equality.arguments[0]}),
-                             parametrized_term.substitute(
-                                 {'_': equality.arguments[1]})])
+                   {'_': equality.arguments[0]}),
+                   parametrized_term.substitute(
+                       {'_': equality.arguments[1]})])
         # Task 10.8
 
     def _add_chaining_of_two_equalities(self, line_number1: int,
