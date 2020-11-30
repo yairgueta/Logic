@@ -44,7 +44,6 @@ def prove_corollary(antecedent_proof: Proof, consequent: Formula,
     new_proof = Proof(InferenceRule([antecedent_proof.statement.assumptions[0]], consequent),
                       antecedent_proof.rules.union({MP, conditional}),
                       new_lines)
-    print("got:\n", new_proof)
     return new_proof
 
 
