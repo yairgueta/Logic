@@ -303,7 +303,7 @@ def test_formula_substitute(debug=False):
         if debug:
             print('Substituting', substitution_map, 'in', formula, 'yields',
                   result)
-        assert result == expected
+        assert result == expected, expected
 
     for s,substitution,forbidden_variables,variable_name in [
             ('w=y', {'y':'x'}, {'x'}, 'x'),

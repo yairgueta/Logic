@@ -295,6 +295,22 @@ class Term:
         for variable in forbidden_variables:
             assert is_variable(variable)
         # Task 9.1
+        for val in substitution_map.values():
+            intersection = val.variables().intersection(forbidden_variables)
+            if intersection:
+                raise ForbiddenVariableError(next(iter(intersection)))
+        return self.__substitute_helper(substitution_map)
+
+    def __substitute_helper(self, substitution_map: Mapping[str, Term]) -> Term:
+        if is_constant(self.root) or is_variable(self.root):
+            temp = substitution_map.get(self.root)
+            if temp is not None:
+                return temp
+            return self
+        else:
+            return Term(self.root,
+                        [s.__substitute_helper(substitution_map) for
+                         s in self.arguments])
 
 
 @lru_cache(maxsize=100)  # Cache the return value of is_equality
@@ -711,6 +727,31 @@ class Formula:
         for variable in forbidden_variables:
             assert is_variable(variable)
         # Task 9.2
+        return self.__substitute_formula_helper(forbidden_variables, substitution_map, self.free_variables())
+
+    def __substitute_formula_helper(self, forbidden_variables, substitution_map, free_vars):
+        if is_equality(self.root) or is_relation(self.root):
+            new_arguments = []
+            for arg in self.arguments:
+                if not arg.variables().issubset(free_vars):
+                    new_arguments.append(arg)
+                else:
+                    new_arguments.append(arg.substitute(substitution_map, forbidden_variables))
+            return Formula(self.root, new_arguments)
+        elif is_unary(self.root):
+            return Formula(self.root,
+                           self.first.substitute(substitution_map,
+                                                 forbidden_variables))
+        elif is_binary(self.root):
+            return Formula(self.root,
+                           self.first.substitute(substitution_map,
+                                                 forbidden_variables),
+                           self.second.substitute(substitution_map,
+                                                  forbidden_variables))
+        else:
+            return Formula(self.root, self.variable,
+                           self.predicate.substitute(substitution_map,
+                                                     set(forbidden_variables).union({self.variable})))
 
     def propositional_skeleton(self) -> Tuple[PropositionalFormula,
                                               Mapping[str, Formula]]:
@@ -737,6 +778,21 @@ class Formula:
             (((z4&z5)|(z5->~z6)), {'z4': Ax[x=7], 'z5': x=7, 'z6': Q(y)})
         """
         # Task 9.8
+        var_map = dict()
+        return self.__skeleton_helper(var_map), {key: val for val, key in var_map.items()}
+
+    def __skeleton_helper(self, var_map):
+        if is_equality(self.root) or is_relation(self.root) or is_quantifier(self.root):
+            zi = var_map.get(self)
+            if not zi:
+                zi = next(fresh_variable_name_generator)
+                var_map.update({self: zi})
+            return PropositionalFormula(zi)
+        elif is_unary(self.root):
+            return PropositionalFormula(self.root, self.first.__skeleton_helper(var_map))
+        elif is_binary(self.root):
+            return PropositionalFormula(self.root, self.first.__skeleton_helper(var_map),
+                                        self.second.__skeleton_helper(var_map))
 
     @staticmethod
     def from_propositional_skeleton(skeleton: PropositionalFormula,
@@ -769,3 +825,11 @@ class Formula:
         for variable in skeleton.variables():
             assert variable in substitution_map
         # Task 9.10
+        if is_propositional_variable(skeleton.root):
+            return substitution_map[skeleton.root]
+        elif is_unary(skeleton.root):
+            return Formula(skeleton.root, Formula.from_propositional_skeleton(skeleton.first, substitution_map))
+        else:
+            return Formula(skeleton.root, Formula.from_propositional_skeleton(skeleton.first,
+                                                                              substitution_map),
+                           Formula.from_propositional_skeleton(skeleton.second, substitution_map))
