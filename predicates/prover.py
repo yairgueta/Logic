@@ -109,7 +109,7 @@ class Prover:
         """
         line_number = len(self._lines)
         self._lines.append(line)
-        assert line.is_valid(self._assumptions, self._lines, line_number)
+        assert line.is_valid(self._assumptions, self._lines, line_number), line
         if self._print_as_proof_forms:
             print(('%3d) ' % line_number) + str(line.formula))
         return line_number
@@ -296,7 +296,7 @@ class Prover:
         Examples:
             If Line `line_number` contains the formula
             ``'Ay[Az[f(x,y)=g(z,y)]]'`` and `term` is ``'h(w)'``, then
-            `instantiation` should be ``'Az[f(x,h(w))=g(z,h(w))]'``.
+            `instantiation` should be ``'Azx)]'``.
         """
         if isinstance(instantiation, str):
             instantiation = Formula.parse(instantiation)
@@ -308,7 +308,8 @@ class Prover:
         assert instantiation == \
                quantified.predicate.substitute({quantified.variable: term})
         # Task 10.1
-        _map = {'R': quantified.predicate.substitute({quantified.variable: Term('_')}), 'c': term}
+        _map = {'R': quantified.predicate.substitute({quantified.variable: Term('_')}), 'c': term,
+                'x': quantified.variable}
         step1 = self.add_instantiated_assumption(Formula('->', quantified, instantiation), Prover.UI, _map)
         step2 = self.add_mp(instantiation, line_number, step1)
         return step2
@@ -335,6 +336,17 @@ class Prover:
         for line_number in line_numbers:
             assert line_number < len(self._lines)
         # Task 10.2
+        line_numbers = list(line_numbers)
+        tautology = implication
+        for line in line_numbers:
+            tautology = Formula('->', self._lines[line].formula, tautology)
+
+        step_i = self.add_tautology(tautology)
+        for line in reversed(line_numbers):
+            tautology = tautology.second
+            step_i = self.add_mp(tautology, line, step_i)
+        return step_i
+
 
     def add_existential_derivation(self, consequent: Union[Formula, str],
                                    line_number1: int, line_number2: int) -> int:
@@ -361,6 +373,7 @@ class Prover:
         """
         if isinstance(consequent, str):
             consequent = Formula.parse(consequent)
+
         assert line_number1 < len(self._lines)
         quantified = self._lines[line_number1].formula
         assert quantified.root == 'E'
@@ -369,6 +382,11 @@ class Prover:
         conditional = self._lines[line_number2].formula
         assert conditional == Formula('->', quantified.predicate, consequent)
         # Task 10.3
+        _map = {'R': quantified.predicate.substitute({quantified.variable: Term('_')}), 'Q': consequent,
+                'x': quantified.variable}
+        step1 = self.add_ug(Formula("A", quantified.variable, conditional), line_number2)
+        step2 = self.add_instantiated_assumption(Prover.ES.instantiate(_map), Prover.ES, _map)
+        return self.add_tautological_implication(consequent, {step1, line_number1, step2})
 
     def add_flipped_equality(self, flipped: Union[Formula, str],
                              line_number: int) -> int:
