@@ -280,7 +280,6 @@ def homework_proof(print_as_proof_forms: bool = False) -> Proof:
 GROUP_AXIOMS = frozenset({'plus(0,x)=x', 'plus(minus(x),x)=0',
                           'plus(plus(x,y),z)=plus(x,plus(y,z))'})
 
-
 def right_neutral_proof(stop_before_flipped_equality: bool,
                         stop_before_free_instantiation: bool,
                         stop_before_substituted_equality: bool,
@@ -390,8 +389,21 @@ def unique_zero_proof(print_as_proof_forms: bool = False) -> Proof:
     """
     prover = Prover(GROUP_AXIOMS.union({'plus(a,c)=a'}), print_as_proof_forms)
     # Task 10.10
-    return prover.qed()
+    step1 = prover.add_assumption('plus(a,c)=a')
+    step2 = prover.add_assumption('plus(plus(x,y),z)=plus(x,plus(y,z))')
+    step3 = prover.add_assumption('plus(minus(x),x)=0')
+    step4 = prover.add_assumption('plus(0,x)=x')
+    main_step = prover.add_substituted_equality('plus(minus(a),plus(a,c))=plus(minus(a),a)', step1, 'plus(minus(a),_)')
+    step6 = prover.add_free_instantiation('plus(plus(minus(a),a),c)=plus(minus(a),plus(a,c))',
+                                          step2, {'x': Term.parse("minus(a)"), 'y': Term("a"), 'z': Term("c")})
+    step7 = prover.add_free_instantiation('plus(minus(a),a)=0', step3, {'x': Term('a')})
+    step8 = prover.add_substituted_equality('plus(plus(minus(a),a),c)=plus(0,c)', step7, 'plus(_,c)')
+    step9 = prover.add_flipped_equality('plus(0,c)=plus(plus(minus(a),a),c)', step8)
+    step10 = prover.add_free_instantiation('plus(0,c)=c', step4, {'x': Term('c')})
+    step11 = prover.add_flipped_equality('c=plus(0,c)', step10)
+    step12 = prover.add_chained_equality('c=0', [step11, step9, step6, main_step, step7])
 
+    return prover.qed()
 
 #: The six field axioms
 FIELD_AXIOMS = frozenset(GROUP_AXIOMS.union(

@@ -117,7 +117,7 @@ class Term:
             assert arguments is None
             self.root = root
         else:
-            assert is_function(root)
+            assert is_function(root), root
             assert arguments is not None
             self.root = root
             self.arguments = tuple(arguments)
