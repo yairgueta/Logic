@@ -425,6 +425,34 @@ def multiply_zero_proof(print_as_proof_forms: bool = False) -> Proof:
     """
     prover = Prover(FIELD_AXIOMS, print_as_proof_forms)
     # Task 10.11
+    x, zero = Term('x'), Term('0')
+    assum1 = prover.add_assumption('times(x,plus(y,z))=plus(times(x,y),times(x,z))')
+    assum2 = prover.add_assumption('plus(0,x)=x')
+    assum3 = prover.add_assumption('times(x,y)=times(y,x)')
+
+    step1 = prover.add_free_instantiation('times(x,plus(0,0))=plus(times(x,0),times(x,0))', assum1,{'x':x, 'y': zero, 'z': zero})
+    step2 = prover.add_free_instantiation('plus(0,0)=0', assum2, {'x': zero})
+    step3 = prover.add_substituted_equality('times(x,plus(0,0))=times(x,0)', step2, 'times(x,_)')
+    step4 = prover.add_flipped_equality('times(x,0)=times(x,plus(0,0))', step3)
+    step5 = prover.add_chained_equality('times(x,0)=plus(times(x,0),times(x,0))', [step4, step1])
+
+    # Previous proof:
+    prev_step1 = prover.add_flipped_equality('plus(times(x,0),times(x,0))=times(x,0)', step5)
+    prev_step2 = prover.add_assumption('plus(plus(x,y),z)=plus(x,plus(y,z))')
+    prev_step3 = prover.add_assumption('plus(minus(x),x)=0')
+    prev_main_step = prover.add_substituted_equality('plus(minus(times(x,0)),plus(times(x,0),times(x,0)))=plus(minus(times(x,0)),times(x,0))', prev_step1, 'plus(minus(times(x,0)),_)')
+    prev_step6 = prover.add_free_instantiation('plus(plus(minus(times(x,0)),times(x,0)),times(x,0))=plus(minus(times(x,0)),plus(times(x,0),times(x,0)))',
+                                          prev_step2, {'x': Term.parse("minus(times(x,0))"), 'y': Term.parse("times(x,0)"), 'z': Term.parse("times(x,0)")})
+    prev_step7 = prover.add_free_instantiation('plus(minus(times(x,0)),times(x,0))=0', prev_step3, {'x': Term.parse('times(x,0)')})
+    prev_step8 = prover.add_substituted_equality('plus(plus(minus(times(x,0)),times(x,0)),times(x,0))=plus(0,times(x,0))', prev_step7, 'plus(_,times(x,0))')
+    prev_step9 = prover.add_flipped_equality('plus(0,times(x,0))=plus(plus(minus(times(x,0)),times(x,0)),times(x,0))', prev_step8)
+    prev_step10 = prover.add_free_instantiation('plus(0,times(x,0))=times(x,0)', assum2, {'x': Term.parse('times(x,0)')})
+    prev_step11 = prover.add_flipped_equality('times(x,0)=plus(0,times(x,0))', prev_step10)
+    prev_step12 = prover.add_chained_equality('times(x,0)=0', [prev_step11, prev_step9, prev_step6, prev_main_step, prev_step7])
+
+    step6 = prover.add_free_instantiation("times(0,x)=times(x,0)", assum3, {'y': x, 'x': zero})
+    step7 = prover.add_chained_equality("times(0,x)=0", [step6, prev_step12])
+
     return prover.qed()
 
 
