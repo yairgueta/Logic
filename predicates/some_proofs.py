@@ -499,6 +499,9 @@ def peano_zero_proof(print_as_proof_forms: bool = False) -> Proof:
     """
     prover = Prover(PEANO_AXIOMS, print_as_proof_forms)
     # Task 10.12
+    assumption1 = prover.add_assumption('plus(x,0)=x')
+    assumption2 = prover.add_instantiated_assumption()
+    russel
     return prover.qed()
 
 
