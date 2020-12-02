@@ -280,6 +280,7 @@ def homework_proof(print_as_proof_forms: bool = False) -> Proof:
 GROUP_AXIOMS = frozenset({'plus(0,x)=x', 'plus(minus(x),x)=0',
                           'plus(plus(x,y),z)=plus(x,plus(y,z))'})
 
+
 def right_neutral_proof(stop_before_flipped_equality: bool,
                         stop_before_free_instantiation: bool,
                         stop_before_substituted_equality: bool,
@@ -393,9 +394,11 @@ def unique_zero_proof(print_as_proof_forms: bool = False) -> Proof:
     step2 = prover.add_assumption('plus(plus(x,y),z)=plus(x,plus(y,z))')
     step3 = prover.add_assumption('plus(minus(x),x)=0')
     step4 = prover.add_assumption('plus(0,x)=x')
-    main_step = prover.add_substituted_equality('plus(minus(a),plus(a,c))=plus(minus(a),a)', step1, 'plus(minus(a),_)')
+    main_step = prover.add_substituted_equality('plus(minus(a),plus(a,c))=plus(minus(a),a)', step1,
+                                                'plus(minus(a),_)')
     step6 = prover.add_free_instantiation('plus(plus(minus(a),a),c)=plus(minus(a),plus(a,c))',
-                                          step2, {'x': Term.parse("minus(a)"), 'y': Term("a"), 'z': Term("c")})
+                                          step2,
+                                          {'x': Term.parse("minus(a)"), 'y': Term("a"), 'z': Term("c")})
     step7 = prover.add_free_instantiation('plus(minus(a),a)=0', step3, {'x': Term('a')})
     step8 = prover.add_substituted_equality('plus(plus(minus(a),a),c)=plus(0,c)', step7, 'plus(_,c)')
     step9 = prover.add_flipped_equality('plus(0,c)=plus(plus(minus(a),a),c)', step8)
@@ -405,11 +408,28 @@ def unique_zero_proof(print_as_proof_forms: bool = False) -> Proof:
 
     return prover.qed()
 
+
 #: The six field axioms
 FIELD_AXIOMS = frozenset(GROUP_AXIOMS.union(
     {'plus(x,y)=plus(y,x)', 'times(x,1)=x', 'times(x,y)=times(y,x)',
      'times(times(x,y),z)=times(x,times(y,z))', '(~x=0->Ey[times(y,x)=1])',
      'times(x,plus(y,z))=plus(times(x,y),times(x,z))'}))
+
+def noi_multiply_zero(print_as_proof_forms: bool = False):
+    prover = Prover(FIELD_AXIOMS, print_as_proof_forms)
+    x = Term('x')
+    zero = Term('0')
+    assumption1 = prover.add_assumption('plus(0,x)=x')
+    assumption2 = prover.add_assumption('times(x,plus(y,z))=plus(times(x,y),times(x,z))')
+    assumption3 = prover.add_assumption('times(x,y)=times(y,x)')
+
+    step1 = prover.add_free_instantiation('plus(0,0)=0', assumption1, {'x': zero})
+    step2 = prover.add_flipped_equality('0=plus(0,0)', step1)
+    step3 = prover.add_substituted_equality('times(x,0)=times(x,plus(0,0))', step2, 'times(x,_)')
+    step4 = prover.add_free_instantiation('times(x,plus(0,0))=plus(times(x,0),times(x,0))', assumption2,
+                                          {'y': zero, 'z': zero})
+    step5 = prover.add_chained_equality('times(x,0)=plus(times(x,0),times(x,0))', [step3, step4])
+    step5_1 = prover.add_flipped_equality('plus(times(x,0),times(x,0))=times(x,0)', step5)
 
 
 def multiply_zero_proof(print_as_proof_forms: bool = False) -> Proof:
