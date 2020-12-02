@@ -206,7 +206,7 @@ class Term:
         """
         # Task 7.3.2
         prefix, suffix = Term._parse_prefix(string)
-        assert prefix is not None and len(suffix) == 0
+        assert prefix is not None and len(suffix) == 0, string
         return prefix
 
     def __collect_vars(self, final_set, func):

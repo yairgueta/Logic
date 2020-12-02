@@ -514,8 +514,18 @@ def peano_zero_proof(print_as_proof_forms: bool = False) -> Proof:
     # Task 10.12
     assumption1 = prover.add_assumption('plus(x,0)=x')
     assumption2 = prover.add_instantiated_assumption(
-        '((plus(0,0)=0&Ax[(plus(0,x)=0->plus(0,s(x))=0)])->Ax[plus(0,x)=0])',
-        INDUCTION_AXIOM, {'R': Term.parse('plus(0,_)=0')})
+        '((plus(0,0)=0&Ax[(plus(0,x)=x->plus(0,s(x))=s(x))])->Ax[plus(0,x)=x])',
+        INDUCTION_AXIOM, {'R': Formula.parse('plus(0,_)=_')})
+    assumption3 = prover.add_assumption('plus(x,s(y))=s(plus(x,y))')
+
+    zero = Term('0')
+    step1 = prover.add_free_instantiation('plus(0,0)=0', assumption1, {'x': zero})
+    step2 = prover.add_free_instantiation('plus(0,s(x))=s(plus(0,x))', assumption3, {'x': zero, 'y': Term('x')})
+    step3 = prover.add_instantiated_assumption('(plus(0,x)=x->(plus(0,s(x))=s(plus(0,x))->plus(0,s(x))=s(x)))', Prover.ME, {'c': Term.parse('plus(0,x)') , 'd': Term('x'), 'R': Formula.parse('plus(0,s(x))=s(_)')})
+    step4 = prover.add_tautological_implication('(plus(0,x)=x->plus(0,s(x))=s(x))', {step2, step3})
+    step5 = prover.add_ug('Ax[(plus(0,x)=x->plus(0,s(x))=s(x))]', step4)
+    step6 = prover.add_tautological_implication('Ax[plus(0,x)=x]', {step5, step1, assumption2})
+    step7 = prover.add_universal_instantiation('plus(0,x)=x', step6, 'x')
     return prover.qed()
 
 
@@ -538,6 +548,26 @@ def russell_paradox_proof(print_as_proof_forms: bool = False) -> Proof:
     """
     prover = Prover({COMPREHENSION_AXIOM}, print_as_proof_forms)
     # Task 10.13
+    axiom = prover.add_instantiated_assumption('Ey[Ax[((In(x,y)->~In(x,x))&(~In(x,x)->In(x,y)))]]', COMPREHENSION_AXIOM, {'R': Formula.parse('~In(_,_)')})
+    assum1 = prover.add_instantiated_assumption('(Ax[((In(x,y)->~In(x,x))&(~In(x,x)->In(x,y)))]->((In(y,y)->~In(y,y))&(~In(y,y)->In(y,y))))', Prover.UI,
+                                                {'R': Formula.parse('((In(_,y)->~In(_,_))&(~In(_,_)->In(_,y)))'),
+                                                 'x': 'x', 'c': Term('y')})
+    assum2 = prover.add_instantiated_assumption('(((In(y,y)->~In(y,y))&(~In(y,y)->In(y,y)))->Ey[((In(y,y)->~In(y,y))&(~In(y,y)->In(y,y)))])', Prover.EI,
+                                                {'R': Formula.parse('((In(_,_)->~In(_,_))&(~In(_,_)->In(_,_)))'), 'x': 'y', 'c': Term('y')})
+    step1 = prover.add_tautological_implication('(Ax[((In(x,y)->~In(x,x))&(~In(x,x)->In(x,y)))]->Ey[((In(y,y)->~In(y,y))&(~In(y,y)->In(y,y)))])', {assum1, assum2})
+    step2 = prover.add_existential_derivation('Ey[((In(y,y)->~In(y,y))&(~In(y,y)->In(y,y)))]', axiom, step1)
+    contra = Formula.parse('((In(y,y)->~In(y,y))&(~In(y,y)->In(y,y)))')
+    conclusion = Formula.parse('(z=z&~z=z)')
+    imp = Formula('->', contra, conclusion)
+    step3 = prover.add_tautological_implication(imp, set())
+    step4 = prover.add_ug(Formula('A', 'y', imp), step3)
+    step5 = prover.add_instantiated_assumption(Formula('->',
+                                                       Formula('&',
+                                                               Formula('A', 'y', imp),
+                                                               Formula('E', 'y', contra)),
+                                                       conclusion), Prover.ES,
+                                               {'R': Formula.parse('((In(_,_)->~In(_,_))&(~In(_,_)->In(_,_)))'), 'Q': conclusion, 'x': 'y'})
+    step3 = prover.add_tautological_implication('(z=z&~z=z)', {step4, step2, step5})
     return prover.qed()
 
 

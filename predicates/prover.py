@@ -379,7 +379,7 @@ class Prover:
         assert quantified.variable not in consequent.free_variables()
         assert line_number2 < len(self._lines)
         conditional = self._lines[line_number2].formula
-        assert conditional == Formula('->', quantified.predicate, consequent)
+        assert conditional == Formula('->', quantified.predicate, consequent), "\n" + str(conditional) + '\n' +  str(Formula('->', quantified.predicate, consequent))
         # Task 10.3
         _map = {'R': quantified.predicate.substitute({quantified.variable: Term('_')}), 'Q': consequent,
                 'x': quantified.variable}
