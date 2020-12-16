@@ -295,21 +295,20 @@ class Term:
         for variable in forbidden_variables:
             assert is_variable(variable)
         # Task 9.1
-        for val in substitution_map.values():
-            intersection = val.variables().intersection(forbidden_variables)
-            if intersection:
-                raise ForbiddenVariableError(next(iter(intersection)))
-        return self.__substitute_helper(substitution_map)
+        return self.__substitute_helper(substitution_map, forbidden_variables)
 
-    def __substitute_helper(self, substitution_map: Mapping[str, Term]) -> Term:
+    def __substitute_helper(self, substitution_map: Mapping[str, Term], forbids) -> Term:
         if is_constant(self.root) or is_variable(self.root):
             temp = substitution_map.get(self.root)
-            if temp is not None:
-                return temp
-            return self
+            if temp is None or self.root in forbids:
+                return self
+            for key in forbids:  # checks that no forbidden vars in the substitution of the root
+                if key in temp.variables():
+                    raise ForbiddenVariableError(key)
+            return temp
         else:
             return Term(self.root,
-                        [s.__substitute_helper(substitution_map) for
+                        [s.__substitute_helper(substitution_map, forbids) for
                          s in self.arguments])
 
 
