@@ -521,7 +521,7 @@ def peano_zero_proof(print_as_proof_forms: bool = False) -> Proof:
     zero = Term('0')
     step1 = prover.add_free_instantiation('plus(0,0)=0', assumption1, {'x': zero})
     step2 = prover.add_free_instantiation('plus(0,s(x))=s(plus(0,x))', assumption3, {'x': zero, 'y': Term('x')})
-    step3 = prover.add_instantiated_assumption('(plus(0,x)=x->(plus(0,s(x))=s(plus(0,x))->plus(0,s(x))=s(x)))', Prover.ME, {'c': Term.parse('plus(0,x)') , 'd': Term('x'), 'R': Formula.parse('plus(0,s(x))=s(_)')})
+    step3 = prover.add_instantiated_assumption('(plus(0,x)=x->(plus(0,s(x))=s(plus(0,x))->plus(0,s(x))=s(x)))', Prover.ME, {'c': 'plus(0,x)', 'd': 'x', 'R': 'plus(0,s(x))=s(_)'})
     step4 = prover.add_tautological_implication('(plus(0,x)=x->plus(0,s(x))=s(x))', {step2, step3})
     step5 = prover.add_ug('Ax[(plus(0,x)=x->plus(0,s(x))=s(x))]', step4)
     step6 = prover.add_tautological_implication('Ax[plus(0,x)=x]', {step5, step1, assumption2})

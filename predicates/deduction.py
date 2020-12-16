@@ -10,9 +10,12 @@ from predicates.syntax import *
 from predicates.proofs import *
 from predicates.prover import *
 
+
+
+
 def remove_assumption(proof: Proof, assumption: Formula,
                       print_as_proof_forms: bool = False) -> Proof:
-    """Converts the given proof of some `conclusion` formula, an assumption of
+    """Converts the given proof of some `conclusion` conclusion, an assumption of
     which is `assumption`, to a proof of
     ``'(``\ `assumption`\ ``->``\ `conclusion`\ ``)'`` from the same assumptions
     except `assumption`.
@@ -20,7 +23,7 @@ def remove_assumption(proof: Proof, assumption: Formula,
     Parameters:
         proof: valid proof to convert, from assumptions/axioms that include
             `~predicates.prover.Prover.AXIOMS`.
-        assumption: formula that is a simple assumption (i.e., without any
+        assumption: conclusion that is a simple assumption (i.e., without any
             templates) of the given proof, such that no line of the given proof
             is a UG line over a variable that is free in this assumption.
 
@@ -35,6 +38,46 @@ def remove_assumption(proof: Proof, assumption: Formula,
         if isinstance(line, Proof.UGLine):
             assert line.formula.variable not in assumption.free_variables()
     # Task 11.1
+    assumptions = set(proof.assumptions)
+    assumptions.remove(Schema(assumption))
+    # assumptions.union(Prover.AXIOMS)
+    phi = assumption
+    prover = Prover(assumptions, print_as_proof_forms)
+    index_map = [None] * len(proof.lines)
+    for i, line in enumerate(proof.lines):
+        new_line_index = None
+        if type(line) == Proof.AssumptionLine:
+            if line.formula == phi:
+                new_line_index = prover.add_tautology(Formula("->", phi, phi))
+            else:
+                alpha = line.formula
+                step1 = prover.add_instantiated_assumption(alpha, line.assumption, line.instantiation_map)
+                new_line_index = prover.add_tautological_implication(Formula('->', phi, alpha), {step1})
+        elif type(line) == Proof.MPLine:
+            new_line_index = prover.add_tautological_implication(Formula('->', phi, line.formula),
+                                                                 {index_map[line.antecedent_line_number],
+                                                                 index_map[line.conditional_line_number]})
+        elif type(line) == Proof.TautologyLine:
+            new_line_index = prover.add_tautology(line.formula)
+        elif type(line) == Proof.UGLine:
+            phi_imp_alpha_index = index_map[line.predicate_line_number]
+            alpha: Formula = line.formula.predicate
+            x: str = line.formula.variable
+
+            print(alpha)
+            print("*"*12,alpha.substitute({x: Term('_')}))
+            ug_formula = Formula("A", x, Formula("->", phi, alpha))
+            step1 = prover.add_ug(ug_formula, phi_imp_alpha_index)
+
+            inst_map = {'Q': phi, 'R': alpha.substitute({x: Term('_')}), 'x': x}
+            conclusion = Formula("->", phi, Formula("A", x, alpha))
+
+            step2 = prover.add_instantiated_assumption(Formula('->', ug_formula, conclusion), Prover.US, inst_map)
+            new_line_index = prover.add_mp(conclusion, step1, step2)
+        index_map[i] = new_line_index
+
+    return prover.qed()
+
 
 def proof_by_way_of_contradiction(proof: Proof, assumption: Formula,
                                   print_as_proof_forms: bool = False) -> Proof:

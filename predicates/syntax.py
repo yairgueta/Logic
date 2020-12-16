@@ -308,9 +308,7 @@ class Term:
                 return temp
             return self
         else:
-            return Term(self.root,
-                        [s.__substitute_helper(substitution_map) for
-                         s in self.arguments])
+            return Term(self.root, [s.__substitute_helper(substitution_map) for s in self.arguments])
 
 
 @lru_cache(maxsize=100)  # Cache the return value of is_equality
@@ -749,6 +747,7 @@ class Formula:
                            self.second.substitute(substitution_map,
                                                   forbidden_variables))
         else:
+
             return Formula(self.root, self.variable,
                            self.predicate.substitute(substitution_map,
                                                      set(forbidden_variables).union({self.variable})))
