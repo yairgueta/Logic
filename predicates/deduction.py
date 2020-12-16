@@ -10,12 +10,9 @@ from predicates.syntax import *
 from predicates.proofs import *
 from predicates.prover import *
 
-
-
-
 def remove_assumption(proof: Proof, assumption: Formula,
                       print_as_proof_forms: bool = False) -> Proof:
-    """Converts the given proof of some `conclusion` conclusion, an assumption of
+    """Converts the given proof of some `conclusion` formula, an assumption of
     which is `assumption`, to a proof of
     ``'(``\ `assumption`\ ``->``\ `conclusion`\ ``)'`` from the same assumptions
     except `assumption`.
@@ -23,7 +20,7 @@ def remove_assumption(proof: Proof, assumption: Formula,
     Parameters:
         proof: valid proof to convert, from assumptions/axioms that include
             `~predicates.prover.Prover.AXIOMS`.
-        assumption: conclusion that is a simple assumption (i.e., without any
+        assumption: formula that is a simple assumption (i.e., without any
             templates) of the given proof, such that no line of the given proof
             is a UG line over a variable that is free in this assumption.
 
@@ -63,13 +60,10 @@ def remove_assumption(proof: Proof, assumption: Formula,
             phi_imp_alpha_index = index_map[line.predicate_line_number]
             alpha: Formula = line.formula.predicate
             x: str = line.formula.variable
-
-            print(alpha)
-            print("*"*12,alpha.substitute({x: Term('_')}))
             ug_formula = Formula("A", x, Formula("->", phi, alpha))
             step1 = prover.add_ug(ug_formula, phi_imp_alpha_index)
-
             inst_map = {'Q': phi, 'R': alpha.substitute({x: Term('_')}), 'x': x}
+
             conclusion = Formula("->", phi, Formula("A", x, alpha))
 
             step2 = prover.add_instantiated_assumption(Formula('->', ug_formula, conclusion), Prover.US, inst_map)
@@ -77,7 +71,6 @@ def remove_assumption(proof: Proof, assumption: Formula,
         index_map[i] = new_line_index
 
     return prover.qed()
-
 
 def proof_by_way_of_contradiction(proof: Proof, assumption: Formula,
                                   print_as_proof_forms: bool = False) -> Proof:
