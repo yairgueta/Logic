@@ -51,6 +51,8 @@ ADDITIONAL_QUANTIFICATION_AXIOMS = (
                          '((Ex[R(x)]->Ey[Q(y)])&(Ey[Q(y)]->Ex[R(x)])))'),
            {'x', 'y', 'R', 'Q'}))
 
+ALL_AXIOMS = Prover.AXIOMS.union(ADDITIONAL_QUANTIFICATION_AXIOMS)
+
 def is_quantifier_free(formula: Formula) -> bool:
     """Checks if the given formula contains any quantifiers.
 
@@ -62,6 +64,16 @@ def is_quantifier_free(formula: Formula) -> bool:
         otherwise.
     """
     # Task 11.3.1
+    if is_equality(formula.root) or is_relation(formula.root):
+        return True
+    elif is_quantifier(formula.root):
+        return False
+    elif is_binary(formula.root):
+        return is_quantifier_free(formula.first) and is_quantifier_free(formula.second)
+    elif is_unary(formula.root):
+        return is_quantifier_free(formula.first)
+
+
 
 def is_in_prenex_normal_form(formula: Formula) -> bool:
     """Checks if the given formula is in prenex normal form.
@@ -74,6 +86,10 @@ def is_in_prenex_normal_form(formula: Formula) -> bool:
         otherwise.
     """
     # Task 11.3.2
+    if is_quantifier(formula.root):
+        return is_in_prenex_normal_form(formula.predicate)
+    else:
+        return is_quantifier_free(formula)
 
 def equivalence_of(formula1: Formula, formula2: Formula) -> Formula:
     """States the equivalence of the two given formulas as a formula.
@@ -171,6 +187,53 @@ def _uniquely_rename_quantified_variables(formula: Formula) -> \
     for variable in formula.variables():
         assert variable[0] != 'z'
     # Task 11.5
+    prover = Prover(ALL_AXIOMS)
+    if is_unary(formula.root):
+        f, proof = _uniquely_rename_quantified_variables(formula.first)
+        conclusion = Formula('~', f)
+        step = prover.add_proof(proof.conclusion, proof)
+        prover.add_tautological_implication(equivalence_of(formula, conclusion), {step})
+        return conclusion, prover.qed()
+    #ר
+    elif is_binary(formula.root):
+        f1, proof1 = _uniquely_rename_quantified_variables(formula.first)
+        f2, proof2 = _uniquely_rename_quantified_variables(formula.second)
+        step1 = prover.add_proof(proof1.conclusion, proof1)
+        step2 = prover.add_proof(proof2.conclusion, proof2)
+        conclusion = Formula(formula.root, f1, f2)
+        prover.add_tautological_implication(equivalence_of(conclusion, formula), {step1, step2})
+        return conclusion, prover.qed()
+
+    elif is_quantifier(formula.root):
+        z: str = next(fresh_variable_name_generator)
+        x = formula.variable
+        phi = formula.predicate.substitute({x: Term(z)})
+
+        z_phi, proof = _uniquely_rename_quantified_variables(phi)
+        step1 = prover.add_proof(proof.conclusion, proof)  # phiz <=> phi'z
+        step2 = prover.add_tautological_implication(equivalence_of(z_phi, z_phi), set())  # phi'z <=> phi'z
+        Q = formula.root
+        if Q == 'E':
+            scheme: Schema = ADDITIONAL_QUANTIFICATION_AXIOMS[-1]
+        else:
+            scheme: Schema = ADDITIONAL_QUANTIFICATION_AXIOMS[-2]
+        inst_map = {'x': z, 'y': z, 'R': phi.substitute({z: Term('_')}), 'Q': z_phi.substitute({'z': Term('_')})}
+        step3 = prover.add_instantiated_assumption(scheme.instantiate(inst_map), scheme, inst_map)
+        # MP?
+        inst_map2 = {'x': x, 'y': z,
+                     'R': phi.substitute({z: Term('_')}),
+                     'Q': phi.substitute({z: Term('_')})}
+        step4 = prover.add_instantiated_assumption(scheme.instantiate(scheme.instantiate(inst_map2)),
+                                                   scheme, inst_map2)
+        # MP?
+        prover.add_tautological_implication(equivalence_of(formula, Formula(Q, z, z_phi)), {step1, step2,
+                                                                                            step3, step4})
+        return Formula(Q, z, z_phi), prover.qed()
+
+    else:
+        prover.add_tautological_implication(equivalence_of(formula, formula), set())
+        return formula, prover.qed()
+
 
 def _pull_out_quantifications_across_negation(formula: Formula) -> \
         Tuple[Formula, Proof]:
