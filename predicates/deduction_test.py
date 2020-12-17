@@ -102,7 +102,10 @@ def test_proof_by_way_of_contradiction(debug=False):
     result = proof_by_way_of_contradiction(proof, Formula.parse('Ax[~x=c]'),
                                            debug)
     assert result.assumptions == Prover.AXIOMS.union(
-        {Schema(Formula.parse('Ax[x=c]'))})
+        {Schema(Formula.parse('Ax[x=c]'))}),'\n'+str(sorted([str(x.formula) for x in
+                                                           result.assumptions])) \
+                                            +'\n'+ \
+            str(sorted([str(y.formula) for y in Prover.AXIOMS.union({Schema(Formula.parse('Ax[x=c]'))})]))
     assert str(result.conclusion) == '~Ax[~x=c]'
     assert result.is_valid()
 

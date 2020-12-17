@@ -10,6 +10,7 @@ from predicates.syntax import *
 from predicates.proofs import *
 from predicates.prover import *
 
+
 def remove_assumption(proof: Proof, assumption: Formula,
                       print_as_proof_forms: bool = False) -> Proof:
     """Converts the given proof of some `conclusion` formula, an assumption of
@@ -53,9 +54,9 @@ def remove_assumption(proof: Proof, assumption: Formula,
         elif type(line) == Proof.MPLine:
             new_line_index = prover.add_tautological_implication(Formula('->', phi, line.formula),
                                                                  {index_map[line.antecedent_line_number],
-                                                                 index_map[line.conditional_line_number]})
+                                                                  index_map[line.conditional_line_number]})
         elif type(line) == Proof.TautologyLine:
-            new_line_index = prover.add_tautology(line.formula)
+            new_line_index = prover.add_tautology(Formula("->", phi, line.formula))
         elif type(line) == Proof.UGLine:
             phi_imp_alpha_index = index_map[line.predicate_line_number]
             alpha: Formula = line.formula.predicate
@@ -66,11 +67,13 @@ def remove_assumption(proof: Proof, assumption: Formula,
 
             conclusion = Formula("->", phi, Formula("A", x, alpha))
 
-            step2 = prover.add_instantiated_assumption(Formula('->', ug_formula, conclusion), Prover.US, inst_map)
+            step2 = prover.add_instantiated_assumption(Formula('->', ug_formula, conclusion), Prover.US,
+                                                       inst_map)
             new_line_index = prover.add_mp(conclusion, step1, step2)
         index_map[i] = new_line_index
 
     return prover.qed()
+
 
 def proof_by_way_of_contradiction(proof: Proof, assumption: Formula,
                                   print_as_proof_forms: bool = False) -> Proof:
@@ -91,9 +94,16 @@ def proof_by_way_of_contradiction(proof: Proof, assumption: Formula,
         assumptions/axioms as the given proof except `assumption`.
     """
     assert proof.is_valid()
-    assert Schema(assumption) in proof.assumptions
+    phi = Schema(assumption)
+    assert phi in proof.assumptions
     assert proof.assumptions.issuperset(Prover.AXIOMS)
     for line in proof.lines:
         if isinstance(line, Proof.UGLine):
             assert line.formula.variable not in assumption.free_variables()
     # Task 11.2
+    not_assumption = Formula('~', assumption)
+    prover = Prover(set(proof.assumptions) - {phi}, print_as_proof_forms)
+    proof_contradiction = remove_assumption(proof, assumption, print_as_proof_forms)
+    step1 = prover.add_proof(proof_contradiction.conclusion, proof_contradiction)
+    prover.add_tautological_implication(not_assumption, {step1})
+    return prover.qed()
