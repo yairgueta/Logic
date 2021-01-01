@@ -194,41 +194,35 @@ def _uniquely_rename_quantified_variables(formula: Formula) -> \
         step = prover.add_proof(proof.conclusion, proof)
         prover.add_tautological_implication(equivalence_of(formula, conclusion), {step})
         return conclusion, prover.qed()
-    #ר
     elif is_binary(formula.root):
         f1, proof1 = _uniquely_rename_quantified_variables(formula.first)
         f2, proof2 = _uniquely_rename_quantified_variables(formula.second)
         step1 = prover.add_proof(proof1.conclusion, proof1)
         step2 = prover.add_proof(proof2.conclusion, proof2)
         conclusion = Formula(formula.root, f1, f2)
-        prover.add_tautological_implication(equivalence_of(conclusion, formula), {step1, step2})
+        prover.add_tautological_implication(equivalence_of(formula, conclusion), {step1, step2})
         return conclusion, prover.qed()
-
     elif is_quantifier(formula.root):
-        z: str = next(fresh_variable_name_generator)
         x = formula.variable
-        phi = formula.predicate.substitute({x: Term(z)})
-
-        z_phi, proof = _uniquely_rename_quantified_variables(phi)
-        step1 = prover.add_proof(proof.conclusion, proof)  # phiz <=> phi'z
-        step2 = prover.add_tautological_implication(equivalence_of(z_phi, z_phi), set())  # phi'z <=> phi'z
         Q = formula.root
-        if Q == 'E':
-            scheme: Schema = ADDITIONAL_QUANTIFICATION_AXIOMS[-1]
+        phi = formula.predicate
+        z_phi, proof = _uniquely_rename_quantified_variables(phi)  # 1
+        s1 = prover.add_proof(proof.conclusion, proof)
+        z: str = next(fresh_variable_name_generator)
+        formula_to_return = Formula(Q, z, z_phi.substitute({x: Term(z)}))
+        conclusion = equivalence_of(formula, formula_to_return)
+        instantiation_map = {'x': formula.variable, 'y': z,
+                             'R': phi.substitute({x: Term('_')}),
+                             'Q': formula_to_return.predicate.substitute(
+                                 {z: Term('_')})}
+        if formula.root == 'A':
+            s = ADDITIONAL_QUANTIFICATION_AXIOMS[-2]
         else:
-            scheme: Schema = ADDITIONAL_QUANTIFICATION_AXIOMS[-2]
-        inst_map = {'x': z, 'y': z, 'R': phi.substitute({z: Term('_')}), 'Q': z_phi.substitute({'z': Term('_')})}
-        step3 = prover.add_instantiated_assumption(scheme.instantiate(inst_map), scheme, inst_map)
-        # MP?
-        inst_map2 = {'x': x, 'y': z,
-                     'R': phi.substitute({z: Term('_')}),
-                     'Q': phi.substitute({z: Term('_')})}
-        step4 = prover.add_instantiated_assumption(scheme.instantiate(scheme.instantiate(inst_map2)),
-                                                   scheme, inst_map2)
-        # MP?
-        prover.add_tautological_implication(equivalence_of(formula, Formula(Q, z, z_phi)), {step1, step2,
-                                                                                            step3, step4})
-        return Formula(Q, z, z_phi), prover.qed()
+            s = ADDITIONAL_QUANTIFICATION_AXIOMS[-1]
+        s2 = prover.add_instantiated_assumption(Formula('->', proof.conclusion, conclusion), s,
+                                                instantiation_map)
+        prover.add_mp(conclusion, s1, s2)
+        return formula_to_return, prover.qed()
 
     else:
         prover.add_tautological_implication(equivalence_of(formula, formula), set())

@@ -732,10 +732,10 @@ class Formula:
         if is_equality(self.root) or is_relation(self.root):
             new_arguments = []
             for arg in self.arguments:
-                if not arg.variables().issubset(free_vars):
-                    new_arguments.append(arg)
-                else:
-                    new_arguments.append(arg.substitute(substitution_map, forbidden_variables))
+                # if not arg.variables().issubset(free_vars):
+                #     new_arguments.append(arg)
+                # else:
+                new_arguments.append(arg.substitute(substitution_map, forbidden_variables))
             return Formula(self.root, new_arguments)
         elif is_unary(self.root):
             return Formula(self.root,
