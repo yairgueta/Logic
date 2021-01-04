@@ -165,7 +165,7 @@ def test_pull_out_quantifications_across_binary_operator(debug=False):
         result,proof = _pull_out_quantifications_across_binary_operator(formula)
         if debug:
             print('... got', result)
-        assert str(result) == expected
+        assert str(result) == expected, str(result) +"\t\t"+ expected
         assert proof.assumptions == \
             Prover.AXIOMS.union(ADDITIONAL_QUANTIFICATION_AXIOMS)
         assert proof.conclusion == equivalence_of(formula, result)
@@ -199,7 +199,7 @@ def test_to_prenex_normal_form_from_uniquely_named_variables(debug=False):
         assert str(result) == pnf
         assert proof.assumptions == \
             Prover.AXIOMS.union(ADDITIONAL_QUANTIFICATION_AXIOMS)
-        assert proof.conclusion == equivalence_of(formula, result)
+        assert proof.conclusion == equivalence_of(formula, result), str(proof.conclusion) + "\t\t" + str(equivalence_of(formula, result))
         assert proof.is_valid()
 
 def test_to_prenex_normal_form(debug=False):

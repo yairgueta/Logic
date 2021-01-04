@@ -229,6 +229,61 @@ def _uniquely_rename_quantified_variables(formula: Formula) -> \
         return formula, prover.qed()
 
 
+def __swap_quantifier(Q):
+    if Q == 'A':
+        return 'E'
+    return 'A'
+
+
+QUANTIFY_EQUIVALENT_AXIOMS_MAP = frozendict({'A': ADDITIONAL_QUANTIFICATION_AXIOMS[-2], 'E': ADDITIONAL_QUANTIFICATION_AXIOMS[-1]})
+QUANTIFIER_TO_AXIOM_MAPS = tuple(frozendict({'A': ADDITIONAL_QUANTIFICATION_AXIOMS[i], 'E': ADDITIONAL_QUANTIFICATION_AXIOMS[i+1]})
+                            for i in range(0, len(ADDITIONAL_QUANTIFICATION_AXIOMS) - 2, 2))
+
+
+def __pull_out_quantifiers_across_all(formula, is_left, swap_function, axioms, parent_rec_function):
+    if is_left:
+        psi = None
+        inner = formula.first
+        if is_binary(formula.root):
+            psi = formula.second
+    else:
+        inner, psi = formula.second, formula.first
+
+    Q = inner.root
+    prover = Prover(ALL_AXIOMS)
+    if not is_quantifier(Q):
+        prover.add_tautology(equivalence_of(formula, formula))
+        return formula, prover.qed()
+
+    if is_left:
+        n_pred = Formula(formula.root, inner.predicate, psi)
+    else:
+        n_pred = Formula(formula.root, psi, inner.predicate)
+
+    x = inner.variable
+
+    axiom = axioms[Q]
+    Qt = swap_function(Q)
+    equiv_axiom = QUANTIFY_EQUIVALENT_AXIOMS_MAP[Qt]
+
+    axiom_map = {'x': inner.variable, 'R': inner.predicate.substitute({inner.variable: Term('_')})}
+    if psi is not None:
+        axiom_map['Q'] = psi
+    step_axiom = prover.add_instantiated_assumption(axiom.instantiate(axiom_map), axiom, axiom_map)
+
+    pred_prime, pred_prime_proof = parent_rec_function(n_pred)
+    step1 = prover.add_proof(pred_prime_proof.conclusion, pred_prime_proof)
+
+    equiv_axiom_map = {'x': x, 'y': x, 'R': n_pred.substitute({x: Term('_')}),
+                       'Q': pred_prime.substitute({x: Term('_')})}
+    step_equiv_axiom = prover.add_instantiated_assumption(equiv_axiom.instantiate(equiv_axiom_map), equiv_axiom,
+                                                          equiv_axiom_map)
+
+    conclusion = Formula(Qt, x, pred_prime)
+    prover.add_tautological_implication(equivalence_of(formula, conclusion), {step_axiom, step1, step_equiv_axiom})
+
+    return conclusion, prover.qed()
+
 def _pull_out_quantifications_across_negation(formula: Formula) -> \
         Tuple[Formula, Proof]:
     """Converts the given formula with uniquely named variables of the form
@@ -272,6 +327,9 @@ def _pull_out_quantifications_across_negation(formula: Formula) -> \
     """
     assert is_unary(formula.root)
     # Task 11.6
+    return __pull_out_quantifiers_across_all(formula, True, __swap_quantifier, QUANTIFIER_TO_AXIOM_MAPS[0],
+                                             _pull_out_quantifications_across_negation)
+
 
 def _pull_out_quantifications_from_left_across_binary_operator(formula:
                                                                Formula) -> \
@@ -317,9 +375,21 @@ def _pull_out_quantifications_from_left_across_binary_operator(formula:
         True
     """
     assert has_uniquely_named_variables(formula)
-    assert is_binary(formula.root)
+    operator = formula.root
+    assert is_binary(operator)
     # Task 11.7.1
-    
+    operator_map = {'&': (lambda _q: _q, QUANTIFIER_TO_AXIOM_MAPS[1]),
+                    '|': (lambda _q: _q, QUANTIFIER_TO_AXIOM_MAPS[3]),
+                    '->': (__swap_quantifier, QUANTIFIER_TO_AXIOM_MAPS[5])}
+
+    swap_function, axioms = operator_map[operator]
+
+    return __pull_out_quantifiers_across_all(formula, True, swap_function,
+                                             axioms, _pull_out_quantifications_from_left_across_binary_operator)
+
+
+
+
 def _pull_out_quantifications_from_right_across_binary_operator(formula:
                                                                 Formula) -> \
         Tuple[Formula, Proof]:
@@ -364,21 +434,34 @@ def _pull_out_quantifications_from_right_across_binary_operator(formula:
         True
     """
     assert has_uniquely_named_variables(formula)
-    assert is_binary(formula.root)
+    operator = formula.root
+    assert is_binary(operator)
     # Task 11.7.2
+    operator_map = {'&': (lambda _q: _q, QUANTIFIER_TO_AXIOM_MAPS[2]),
+                    '|': (lambda _q: _q, QUANTIFIER_TO_AXIOM_MAPS[4]),
+                    '->': (lambda _q: _q, QUANTIFIER_TO_AXIOM_MAPS[6])}
+
+    swap_function, axioms = operator_map[operator]
+
+    return __pull_out_quantifiers_across_all(formula, False, swap_function,
+                                             axioms, _pull_out_quantifications_from_right_across_binary_operator)
+
 
 def _pull_out_quantifications_across_binary_operator(formula: Formula) -> \
         Tuple[Formula, Proof]:
     """Converts the given formula with uniquely named variables of the form
-    ``'(``\ `Q1`\ `x1`\ ``[``\ `Q2`\ `x2`\ ``[``...\ `Qn`\ `xn`\ ``[``\ `inner_first`\ ``]``...\ ``]]``\ `*`\ `P1`\ `y1`\ ``[``\ `P2`\ `y2`\ ``[``...\ `Pm`\ `ym`\ ``[``\ `inner_second`\ ``]``...\ ``]])'``
+    ``'(``\ `Q1`\ `x1`\ ``[``\ `Q2`\ `x2`\ ``[``...\ `Qn`\ `xn`\ ``[``\ `inner_first`\ ``]``...\ ``]]
+    ``\ `*`\ `P1`\ `y1`\ ``[``\ `P2`\ `y2`\ ``[``...\ `Pm`\ `ym`\ ``[``\ `inner_second`\ ``]``...\ ``]])'``
     to an equivalent formula of the form
-    ``'``\ `Q'1`\ `x1`\ ``[``\ `Q'2`\ `x2`\ ``[``...\ `Q'n`\ `xn`\ ``[``\ `P'1`\ `y1`\ ``[``\ `P'2`\ `y2`\ ``[``...\ `P'm`\ `ym`\ ``[(``\ `inner_first`\ `*`\ `inner_second`\ ``)]``...\ ``]]]``...\ ``]]'``
+    ``'``\ `Q'1`\ `x1`\ ``[``\ `Q'2`\ `x2`\ ``[``...\ `Q'n`\ `xn`\ ``[``\ `P'1`\ `y1`\ ``[``\ `P'2`\ `y2`\ ``
+    [``...\ `P'm`\ `ym`\ ``[(``\ `inner_first`\ `*`\ `inner_second`\ ``)]``...\ ``]]]``...\ ``]]'``
     and proves the equivalence of these two formulas.
 
     Parameters:
         formula: formula with uniquely named variables to convert, whose root
             is a binary operator, i.e., which is of the form
-            ``'(``\ `Q1`\ `x1`\ ``[``\ `Q2`\ `x2`\ ``[``...\ `Qn`\ `xn`\ ``[``\ `inner_first`\ ``]``...\ ``]]``\ `*`\ `P1`\ `y1`\ ``[``\ `P2`\ `y2`\ ``[``...\ `Pm`\ `ym`\ ``[``\ `inner_second`\ ``]``...\ ``]])'``
+            ``'(``\ `Q1`\ `x1`\ ``[``\ `Q2`\ `x2`\ ``[``...\ `Qn`\ `xn`\ ``[``\ `inner_first`\ ``]``...\ ``]]``\ `*`\
+            `P1`\ `y1`\ ``[``\ `P2`\ `y2`\ ``[``...\ `Pm`\ `ym`\ ``[``\ `inner_second`\ ``]``...\ ``]])'``
             where `*` is a binary operator, `n`>=0, `m`>=0, each `Qi` and `Pi`
             is a quantifier, each `xi` and `yi` is a variable name, and neither
             `inner_first` nor `inner_second` starts with a quantifier.
@@ -386,7 +469,8 @@ def _pull_out_quantifications_across_binary_operator(formula: Formula) -> \
     Returns:
         A pair. The first element of the pair is a formula equivalent to the
         given formula, but of the form
-        ``'``\ `Q'1`\ `x1`\ ``[``\ `Q'2`\ `x2`\ ``[``...\ `Q'n`\ `xn`\ ``[``\ `P'1`\ `y1`\ ``[``\ `P'2`\ `y2`\ ``[``...\ `P'm`\ `ym`\ ``[(``\ `inner_first`\ `*`\ `inner_second`\ ``)]``...\ ``]]]``...\ ``]]'``
+        ``'``\ `Q'1`\ `x1`\ ``[``\ `Q'2`\ `x2`\ ``[``...\ `Q'n`\ `xn`\ ``[``\ `P'1`\ `y1`\ ``[``\ `P'2`\ `y2`\ ``[``...\
+         `P'm`\ `ym`\ ``[(``\ `inner_first`\ `*`\ `inner_second`\ ``)]``...\ ``]]]``...\ ``]]'``
         where each `Q'i` and `P'i` is a quantifier, and where the operator `*`,
         the `xi` and `yi` variable names, `inner_first`, and `inner_second` are
         the same as in the given formula. The second element of the pair is a
@@ -412,7 +496,33 @@ def _pull_out_quantifications_across_binary_operator(formula: Formula) -> \
     """
     assert has_uniquely_named_variables(formula)
     assert is_binary(formula.root)
-    # Task 11.8
+    left_pull, left_pull_proof = _pull_out_quantifications_from_left_across_binary_operator(formula)
+
+    left_quantifiers = list()
+    _pred = left_pull
+    while is_quantifier(_pred.root):
+        left_quantifiers.append((_pred.root, _pred.variable))
+        _pred = _pred.predicate
+
+    right_pull, right_pull_proof = _pull_out_quantifications_from_right_across_binary_operator(_pred)
+
+    prover = Prover(ALL_AXIOMS)
+    left_step = prover.add_proof(equivalence_of(formula, left_pull), left_pull_proof)
+    right_step = prover.add_proof(equivalence_of(_pred, right_pull), right_pull_proof)
+
+    quantifying_lines = []
+    while len(left_quantifiers):
+        Q, x = left_quantifiers.pop()
+        axiom = QUANTIFY_EQUIVALENT_AXIOMS_MAP[Q]
+        map = {'x': x, 'y': x, 'R': right_pull.substitute({x: Term('_')}),
+                       'Q': _pred.substitute({x: Term('_')})}
+        right_pull = Formula(Q, x, right_pull)
+        _pred = Formula(Q, x, _pred)
+        quantifying_lines.append(prover.add_instantiated_assumption(axiom.instantiate(map), axiom, map))
+
+    prover.add_tautological_implication(equivalence_of(formula, right_pull), {*quantifying_lines, left_step, right_step})
+    return right_pull, prover.qed()
+
 
 def _to_prenex_normal_form_from_uniquely_named_variables(formula: Formula) -> \
         Tuple[Formula, Proof]:
@@ -447,7 +557,46 @@ def _to_prenex_normal_form_from_uniquely_named_variables(formula: Formula) -> \
         True
     """
     assert has_uniquely_named_variables(formula)
-    # Task 11.9
+    prover = Prover(ALL_AXIOMS)
+    if is_relation(formula.root) or is_equality(formula.root):
+        prover.add_tautology(equivalence_of(formula, formula))
+        return formula, prover.qed()
+    elif is_unary(formula.root):
+        inner, inner_proof = _to_prenex_normal_form_from_uniquely_named_variables(formula.first)
+        n_formula = Formula(formula.root, inner)
+        fp, fp_proof = _pull_out_quantifications_across_negation(n_formula)
+
+        step1 = prover.add_proof(equivalence_of(formula.first, inner), inner_proof)
+        step2 = prover.add_proof(equivalence_of(n_formula, fp), fp_proof)
+        prover.add_tautological_implication(equivalence_of(formula, fp), {step1, step2})
+        return fp, prover.qed()
+
+    elif is_binary(formula.root):
+        inner1, inner1_proof = _to_prenex_normal_form_from_uniquely_named_variables(formula.first)
+        inner2, inner2_proof = _to_prenex_normal_form_from_uniquely_named_variables(formula.second)
+
+        n_formula = Formula(formula.root, inner1, inner2)
+        fp, fp_proof = _pull_out_quantifications_across_binary_operator(n_formula)
+
+        step1 = prover.add_proof(equivalence_of(formula.first, inner1), inner1_proof)
+        step2 = prover.add_proof(equivalence_of(formula.second, inner2), inner2_proof)
+        step3 = prover.add_proof(equivalence_of(n_formula, fp), fp_proof)
+        prover.add_tautological_implication(equivalence_of(formula, fp), {step1, step2, step3})
+        return fp, prover.qed()
+    else:
+        Q, x, _pred = formula.root, formula.variable, formula.predicate
+        n_pred, n_pred_proof = _to_prenex_normal_form_from_uniquely_named_variables(_pred)
+        axiom = QUANTIFY_EQUIVALENT_AXIOMS_MAP[Q]
+        map = {'x': x, 'y': x, 'R': _pred.substitute({x: Term('_')}),
+                       'Q': n_pred.substitute({x: Term('_')})}
+        step1 = prover.add_instantiated_assumption(axiom.instantiate(map), axiom, map)
+        step2 = prover.add_proof(equivalence_of(_pred, n_pred), n_pred_proof)
+
+        conclusion = Formula(Q, x, n_pred)
+        prover.add_tautological_implication(equivalence_of(formula, conclusion), {step1, step2})
+        return conclusion, prover.qed()
+
+
 
 def to_prenex_normal_form(formula: Formula) -> Tuple[Formula, Proof]:
     """Converts the given formula to an equivalent formula in prenex normal
@@ -482,3 +631,11 @@ def to_prenex_normal_form(formula: Formula) -> Tuple[Formula, Proof]:
     for variable in formula.variables():
         assert variable[0] != 'z'
     # Task 11.10
+    uni_formula, uni_proof = _uniquely_rename_quantified_variables(formula)
+    pnf_formula, pnf_proof = _to_prenex_normal_form_from_uniquely_named_variables(uni_formula)
+
+    prover = Prover(ALL_AXIOMS)
+    step1 = prover.add_proof(equivalence_of(formula, uni_formula), uni_proof)
+    step2 = prover.add_proof(equivalence_of(uni_formula, pnf_formula), pnf_proof)
+    prover.add_tautological_implication(equivalence_of(formula, pnf_formula), {step1, step2})
+    return pnf_formula, prover.qed()

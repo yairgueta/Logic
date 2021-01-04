@@ -253,7 +253,7 @@ class Prover:
         """
         if isinstance(conclusion, str):
             conclusion = Formula.parse(conclusion)
-        assert proof.conclusion == conclusion
+        assert proof.conclusion == conclusion, str(proof.conclusion) + "\t\t" + str(conclusion)
         assert proof.assumptions.issubset(self._assumptions)
         line_shift = len(self._lines)
         for line in proof.lines:

@@ -591,6 +591,17 @@ def _not_exists_not_implies_all_proof(formula: Formula, variable: str,
     """
     assert is_variable(variable)
     # Optional Task 11.4.1
+    not_f = Formula('~', formula)
+    not_exists = Formula('~', Formula('E', variable, not_f))
+    prover = Prover(Prover.AXIOMS.union({not_exists}), print_as_proof_forms)
+
+    map = {'R': not_f.substitute({variable: Term('_')}), 'c': Term(variable), 'x': variable}
+    assum1 = prover.add_assumption(not_exists)
+    axiom1 = prover.add_instantiated_assumption(Prover.EI.instantiate(map), Prover.EI, map)
+    step1 = prover.add_tautological_implication(formula, {assum1, axiom1})
+    step2 = prover.add_ug(Formula('A', variable, formula), step1)
+    return remove_assumption(prover.qed(), not_exists, print_as_proof_forms)
+
 
 
 def _exists_not_implies_not_all_proof(formula: Formula, variable: str,
@@ -613,7 +624,18 @@ def _exists_not_implies_not_all_proof(formula: Formula, variable: str,
     """
     assert is_variable(variable)
     # Optional Task 11.4.2
+    not_f = Formula('~', formula)
+    exists_not = Formula('E', variable, not_f)
+    not_forall = Formula('~', Formula('A', variable, formula))
 
+    prover = Prover(Prover.AXIOMS.union({exists_not}), print_as_proof_forms)
+
+    assum1 = prover.add_assumption(exists_not)
+    map = {'R': formula.substitute({variable: Term('_')}), 'x': variable, 'c': Term(variable)}
+    axiom1 = prover.add_instantiated_assumption(Prover.UI.instantiate(map), prover.UI, map)
+    step1 = prover.add_tautological_implication(Formula('->', not_f, not_forall), {axiom1})
+    prover.add_existential_derivation(not_forall, assum1, step1)
+    return remove_assumption(prover.qed(), exists_not, print_as_proof_forms)
 
 def not_all_iff_exists_not_proof(formula: Formula, variable: str,
                                  print_as_proof_forms: bool = False) -> Proof:
@@ -634,3 +656,13 @@ def not_all_iff_exists_not_proof(formula: Formula, variable: str,
     """
     assert is_variable(variable)
     # Optional Task 11.4.3
+    side1 = _not_exists_not_implies_all_proof(formula, variable)
+    side2 = _exists_not_implies_not_all_proof(formula, variable)
+
+    prover = Prover(Prover.AXIOMS, print_as_proof_forms)
+    step1 = prover.add_proof(side1.conclusion, side1)
+    step2 = prover.add_proof(side2.conclusion, side2)
+    step3 = prover.add_tautological_implication(equivalence_of(Formula('~', Formula('A', variable, formula)),
+                                                               Formula('E', variable, Formula('~', formula))),
+                                                {step1, step2})
+    return prover.qed()
