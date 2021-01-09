@@ -27,11 +27,11 @@ def _test_is_closed(test_primitively=False, test_universally=False,
     def _test_closures(sentences, primitively, universally, existentially):
         sentences = frozenset(sentences)
         if test_primitively:
-            assert is_primitively_closed(sentences) == primitively
+            assert is_primitively_closed(sentences) == primitively, sentences
         if test_universally:
-            assert is_universally_closed(sentences) == universally
+            assert is_universally_closed(sentences) == universally, universally
         if test_existentially:
-            assert is_existentially_closed(sentences) == existentially
+            assert is_existentially_closed(sentences) == existentially, existentially
 
     # Test on closed sets
     for six_element_group_primitives in [
@@ -547,7 +547,9 @@ def test_replace_constant(debug=False):
         replaced = replace_constant(proof, 'aristotle', 'z')
         assert replaced.assumptions == Prover.AXIOMS.union(
             {Schema(Formula.parse('Ax[(Man(x)->Mortal(x))]')),
-             Schema(Formula.parse('Man(z)'))})
+             Schema(Formula.parse('Man(z)'))}), '\n'+str(replaced.assumptions) + "\n"*2 + str(Prover.AXIOMS.union(
+                                                                                    {Schema(Formula.parse('Ax[(Man(x)->Mortal(x))]')),
+                                                                                     Schema(Formula.parse('Man(z)'))}))
         assert str(replaced.conclusion) == 'Mortal(z)'
         if debug:
             print('Verifying returned proof (' +
@@ -569,7 +571,8 @@ def test_replace_constant(debug=False):
         print('Verifying returned proof (' +
               '{:,}'.format(len(replaced.lines)),
               'lines) of', replaced.conclusion)
-    assert replaced.is_valid()
+        # print(proof)
+    assert replaced.is_valid(), replaced
 
 def test_eliminate_existential_witness_assumption(debug=False):
     assumptions = {Schema(Formula.parse('Ax[(R(x)->(Q(x)&~Q(x)))]')),
@@ -625,7 +628,7 @@ def test_existential_closure_step(debug=False):
     assert is_existentially_closed(augmented)
     if debug:
         print('Testing existential_closure_step on result...')
-    assert existential_closure_step(augmented) == augmented
+    assert existential_closure_step(augmented) == augmented, '\n'+str(augmented) + '\n'*2 + str(existential_closure_step(augmented))
 
     if debug:
         print('Testing existential_closure_step on noncommutativity axiom with '

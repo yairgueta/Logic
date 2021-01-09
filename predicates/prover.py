@@ -375,7 +375,7 @@ class Prover:
 
         assert line_number1 < len(self._lines)
         quantified = self._lines[line_number1].formula
-        assert quantified.root == 'E'
+        assert quantified.root == 'E', quantified
         assert quantified.variable not in consequent.free_variables()
         assert line_number2 < len(self._lines)
         conditional = self._lines[line_number2].formula

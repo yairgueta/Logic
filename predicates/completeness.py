@@ -5,7 +5,7 @@
 # File name: predicates/completeness.py
 
 """Building blocks for proving the Completeness Theorem for Predicate Logic."""
-
+import itertools
 from typing import AbstractSet, Container, Set, Union
 
 from logic_utils import fresh_constant_name_generator
@@ -16,6 +16,9 @@ from predicates.proofs import *
 from predicates.prover import *
 from predicates.deduction import *
 from predicates.prenex import *
+
+def _not(f: Formula) -> Formula:
+    return Formula('~', f)
 
 def get_constants(formulas: AbstractSet[Formula]) -> Set[str]:
     """Finds all constant names in the given formulas.
@@ -66,6 +69,23 @@ def is_primitively_closed(sentences: AbstractSet[Formula]) -> bool:
         assert is_in_prenex_normal_form(sentence) and \
                len(sentence.free_variables()) == 0
     # Task 12.1.1
+    constants = {Term(s) for s in get_constants(sentences)}
+    relations = set()
+    primitives = set()
+    for s in sentences:
+        relations.update(s.relations())
+        if is_unary(s.root):
+            s = s.first
+        if is_relation(s.root):
+            primitives.add((s.root, s.arguments))
+
+    for r in relations:
+        for arity in itertools.product(constants, repeat=r[1]):
+            if (r[0], arity) not in primitives:
+                return False
+    return True
+
+
 
 def is_universally_closed(sentences: AbstractSet[Formula]) -> bool:
     """Checks whether the given set of prenex-normal-form sentences is
@@ -84,7 +104,18 @@ def is_universally_closed(sentences: AbstractSet[Formula]) -> bool:
     for sentence in sentences:
         assert is_in_prenex_normal_form(sentence) and \
                len(sentence.free_variables()) == 0
-    # Task 12.1.2
+    predicates = set()
+    constants = {Term(s) for s in get_constants(sentences)}
+    for sentence in sentences:
+        if is_quantifier(sentence.root):
+            if sentence.root == 'A':
+                predicates.add((sentence.variable, sentence.predicate))
+
+    for pred in predicates:
+        for c in constants:
+            if pred[1].substitute({pred[0]: c}) not in sentences:
+                return False
+    return True
 
 def is_existentially_closed(sentences: AbstractSet[Formula]) -> bool:
     """Checks whether the given set of prenex-normal-form sentences is
@@ -104,6 +135,20 @@ def is_existentially_closed(sentences: AbstractSet[Formula]) -> bool:
         assert is_in_prenex_normal_form(sentence) and \
                len(sentence.free_variables()) == 0
     # Task 12.1.3
+    predicates = set()
+    constants = {Term(s) for s in get_constants(sentences)}
+    for sentence in sentences:
+        if is_quantifier(sentence.root):
+            if sentence.root == 'E':
+                predicates.add((sentence.variable, sentence.predicate))
+
+    for pred in predicates:
+        for c in constants:
+            if pred[1].substitute({pred[0]: c}) in sentences:
+                break
+        else:
+            return False
+    return True
 
 def find_unsatisfied_quantifier_free_sentence(sentences: Container[Formula],
                                               model: Model[str],
@@ -143,6 +188,13 @@ def find_unsatisfied_quantifier_free_sentence(sentences: Container[Formula],
     assert unsatisfied in sentences
     assert not model.evaluate_formula(unsatisfied)
     # Task 12.2
+    if is_quantifier(unsatisfied.root):
+        for c in model.universe:
+            substituted = unsatisfied.predicate.substitute({unsatisfied.variable: Term(c)})
+            if substituted in sentences and not model.evaluate_formula(substituted):
+                return find_unsatisfied_quantifier_free_sentence(sentences, model, substituted)
+    else:
+        return unsatisfied
 
 def get_primitives(quantifier_free: Formula) -> Set[Formula]:
     """Finds all primitive subformulas of the given quantifier-free formula.
@@ -161,6 +213,21 @@ def get_primitives(quantifier_free: Formula) -> Set[Formula]:
     """
     assert is_quantifier_free(quantifier_free)
     # Task 12.3.1
+    if is_unary(quantifier_free.root):
+        return get_primitives(quantifier_free.first)
+    if is_binary(quantifier_free.root):
+        return get_primitives(quantifier_free.first).union(get_primitives(quantifier_free.second))
+    if is_relation(quantifier_free.root):
+        return {quantifier_free}
+
+
+def _is_primitive_or_its_negation(formula: Formula) -> bool:
+    if is_unary(formula.root):
+        formula = formula.first
+    if is_relation(formula.root):
+        return True
+    return False
+
 
 def model_or_inconsistency(sentences: AbstractSet[Formula]) -> \
         Union[Model[str], Proof]:
@@ -178,6 +245,26 @@ def model_or_inconsistency(sentences: AbstractSet[Formula]) -> \
     """    
     assert is_closed(sentences)
     # Task 12.3.2
+    primitives = {s for s in sentences if _is_primitive_or_its_negation(s)}
+    universe = get_constants(sentences)
+    relation_meanings = {}
+    for primitive in primitives:
+        if not is_unary(primitive.root):
+            relation_meanings.setdefault(primitive.root, set()).add(tuple(str(t) for t in primitive.arguments))
+    model = Model(universe, {c: c for c in universe}, relation_meanings)
+
+    for s in sentences:
+        if not model.evaluate_formula(s):
+            unsat = find_unsatisfied_quantifier_free_sentence(sentences, model, s)
+            unsat_primitives = {f if f in primitives else _not(f) for f in get_primitives(unsat)}
+
+            prover = Prover(Prover.AXIOMS.union(unsat_primitives, {unsat}))
+            lines = {prover.add_assumption(unsat)}
+            lines.update({prover.add_assumption(f) for f in unsat_primitives})
+            prover.add_tautological_implication(Formula('&', unsat, _not(unsat)), lines)
+            return prover.qed()
+    return model
+
 
 def combine_contradictions(proof_from_affirmation: Proof,
                            proof_from_negation: Proof) -> Proof:
@@ -212,14 +299,25 @@ def combine_contradictions(proof_from_affirmation: Proof,
         proof_from_negation.assumptions.difference(common_assumptions))[0]
     assert len(affirmed_assumption.templates) == 0
     assert len(negated_assumption.templates) == 0
-    assert negated_assumption.formula == \
-           Formula('~', affirmed_assumption.formula)
+    affirmed_formula = affirmed_assumption.formula
+    negated_formula = negated_assumption.formula
+    assert negated_formula == \
+           Formula('~', affirmed_formula)
     assert proof_from_affirmation.assumptions.issuperset(Prover.AXIOMS)
     assert proof_from_negation.assumptions.issuperset(Prover.AXIOMS)
     for assumption in common_assumptions.union({affirmed_assumption,
                                                 negated_assumption}):
         assert len(assumption.formula.free_variables()) == 0
     # Task 12.4
+    contra1 = proof_by_way_of_contradiction(proof_from_affirmation, affirmed_formula)
+    contra2 = proof_by_way_of_contradiction(proof_from_negation, negated_formula)
+
+    prover = Prover(common_assumptions)
+    affir_step = prover.add_proof(_not(affirmed_formula), contra1)
+    neg_step = prover.add_proof(_not(negated_formula), contra2)
+    prover.add_tautological_implication(Formula('&', affirmed_formula, negated_formula), {affir_step, neg_step})
+    return prover.qed()
+
 
 def eliminate_universal_instantiation_assumption(proof: Proof, constant: str,
                                                  instantiation: Formula,
@@ -252,6 +350,16 @@ def eliminate_universal_instantiation_assumption(proof: Proof, constant: str,
     for assumption in proof.assumptions:
         assert len(assumption.formula.free_variables()) == 0
     # Task 12.5
+    contra_proof = proof_by_way_of_contradiction(proof, instantiation)
+    prover = Prover(contra_proof.assumptions)
+    step1 = prover.add_proof(_not(instantiation), contra_proof)
+    step2 = prover.add_assumption(universal)
+    step3 = prover.add_universal_instantiation(instantiation, step2, constant)
+    prover.add_tautological_implication(Formula('&', instantiation, _not(instantiation)), {step1, step3})
+
+    return prover.qed()
+
+
 
 def universal_closure_step(sentences: AbstractSet[Formula]) -> Set[Formula]:
     """Augments the given sentences with all universal instantiations of each
@@ -272,6 +380,14 @@ def universal_closure_step(sentences: AbstractSet[Formula]) -> Set[Formula]:
         assert is_in_prenex_normal_form(sentence) and \
                len(sentence.free_variables()) == 0
     # Task 12.6
+    universe = {Term(c) for c in get_constants(sentences)}
+    new_sentences = {x for x in sentences}
+    for s in sentences:
+        if s.root == 'A':
+            for c in universe:
+                new_sentences.add(s.predicate.substitute({s.variable: c}))
+    return new_sentences
+
 
 def replace_constant(proof: Proof, constant: str, variable: str = 'zz') -> \
         Proof:
@@ -299,6 +415,29 @@ def replace_constant(proof: Proof, constant: str, variable: str = 'zz') -> \
     for line in proof.lines:
         assert variable not in line.formula.variables()
     # Task 12.7.1
+    lines = []
+    map = {constant: Term(variable)}
+    for l in proof.lines:
+        f = l.formula.substitute(map)
+        if isinstance(l, Proof.TautologyLine):
+            line = Proof.TautologyLine(f)
+        if isinstance(l, Proof.AssumptionLine):
+            ins_map = {}
+            for x,y in l.instantiation_map.items():
+                if isinstance(y, str):
+                    ins_map[x] = y if y != constant else variable
+                else:
+                    ins_map[x] = y.substitute(map)
+            line = Proof.AssumptionLine(f, l.assumption, ins_map)
+        if isinstance(l, Proof.MPLine):
+            line = Proof.MPLine(f, l.antecedent_line_number, l.conditional_line_number)
+        if isinstance(l, Proof.UGLine):
+            line = Proof.UGLine(f, l.predicate_line_number)
+        lines.append(line)
+
+    assumptions = {Schema(s.formula.substitute(map), s.templates) for s in proof.assumptions}
+    return Proof(assumptions, lines[-1].formula, lines)
+
 
 def eliminate_existential_witness_assumption(proof: Proof, constant: str,
                                              witness: Formula,
@@ -337,6 +476,25 @@ def eliminate_existential_witness_assumption(proof: Proof, constant: str,
     for assumption in proof.assumptions.difference({Schema(witness)}):
         assert constant not in assumption.formula.constants()
     # Task 12.7.2
+    var = 'zz'
+    contra_proof = proof_by_way_of_contradiction(proof, witness)
+    contra_zz_proof = replace_constant(contra_proof, constant, var)
+
+    contra = Formula('&', witness, _not(witness))
+    n_phizz = contra_zz_proof.conclusion
+
+    prover = Prover(contra_zz_proof.assumptions)
+    step1 = prover.add_proof(n_phizz, contra_zz_proof)
+    step3 = prover.add_assumption(existential)
+    step4 = prover.add_ug(Formula('A', var, n_phizz), step1)
+
+    n_phix = n_phizz.substitute({var: Term(existential.variable)})
+    step5 = prover.add_universal_instantiation(n_phix, step4, existential.variable)
+    step2 = prover.add_tautological_implication(Formula('->', n_phix.first, contra), {step5})
+    step4 = prover.add_existential_derivation(contra, step3, step2)
+    return prover.qed()
+
+
 
 def existential_closure_step(sentences: AbstractSet[Formula]) -> Set[Formula]:
     """Augments the given sentences with an existential witness that uses a new
@@ -352,10 +510,21 @@ def existential_closure_step(sentences: AbstractSet[Formula]) -> Set[Formula]:
         existentially quantified sentence from the given sentences, a formula
         obtained from the predicate of that quantified sentence by replacing all
         occurrences of the quantification variable with a new constant name
-        obtained by calling
+        obtained by callingמר
         `next`\ ``(``\ `~logic_utils.fresh_constant_name_generator`\ ``)``.
     """
     for sentence in sentences:
         assert is_in_prenex_normal_form(sentence) and \
                len(sentence.free_variables()) == 0
     # Task 12.8
+    universe = {Term(c) for c in get_constants(sentences)}
+    new_sentences = {x for x in sentences}
+    for s in sentences:
+        if s.root == 'E':
+            for c in universe:
+                if s.predicate.substitute({s.variable: c}) in sentences:
+                    break
+            else:
+                _c = next(fresh_constant_name_generator)
+                new_sentences.add(s.predicate.substitute({s.variable: Term(_c)}))
+    return new_sentences

@@ -741,6 +741,7 @@ class Proof:
         for line_number in range(len(self.lines)):
             if not self.lines[line_number].is_valid(self.assumptions,
                                                     self.lines, line_number):
+                print(line_number)
                 return False
         return True
 
